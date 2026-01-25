@@ -1,8 +1,7 @@
 streamlit
-finance-datareader
+finance-datareader>=0.9.90
 pandas
 matplotlib
 numpy
 lxml
 beautifulsoup4
-openpyxl
