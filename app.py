@@ -17,14 +17,14 @@ st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
 @st.cache_resource
 def set_korean_font():
-    # 1. 현재 폴더에 있는 폰트 파일 우선 적용 (GitHub에 올린 파일)
+    # 1. 현재 폴더에 있는 폰트 파일 우선 적용
     font_path = 'NanumGothic.ttf' 
     if os.path.exists(font_path):
         fm.fontManager.addfont(font_path)
         font_prop = fm.FontProperties(fname=font_path)
         plt.rc('font', family=font_prop.get_name())
     else:
-        # 2. 파일이 없으면 시스템 폰트 시도 (packages.txt 설치분)
+        # 2. 파일이 없으면 시스템 폰트 시도
         plt.rc('font', family='NanumGothic')
     
     plt.rcParams['axes.unicode_minus'] = False
@@ -32,7 +32,57 @@ def set_korean_font():
 set_korean_font()
 
 # ---------------------------------------------------------
-# 1. 지표 계산 함수 (기존 로직 동일)
+# [추가] 방문자 수 및 동시 접속자 집계 함수
+# ---------------------------------------------------------
+def get_traffic_metrics():
+    # 1. 동시 접속자 수 (Streamlit Runtime 접근)
+    try:
+        from streamlit.runtime import get_instance
+        runtime = get_instance()
+        session_info = runtime._session_manager._session_info_map
+        active_users = len(session_info)
+    except:
+        active_users = 1 # 오류 시 기본값
+
+    # 2. 방문자 수 기록 (CSV 파일 사용)
+    file_path = "visitors.csv"
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # 기본값
+    total_visits = 0
+    today_visits = 0
+    
+    # 파일이 있으면 읽기
+    if os.path.exists(file_path):
+        try:
+            df_v = pd.read_csv(file_path)
+            if not df_v.empty:
+                last_date = df_v.iloc[-1]['date']
+                total_visits = int(df_v.iloc[-1]['total'])
+                today_visits = int(df_v.iloc[-1]['today'])
+                
+                # 날짜가 바뀌었으면 오늘 방문자 초기화
+                if last_date != today_str:
+                    today_visits = 0
+        except:
+            pass
+            
+    # 카운트 증가 (새로고침 할 때마다 증가)
+    # Session State를 써서 한 세션 내에서는 증가 안 하게 할 수도 있지만, 
+    # 여기서는 단순 조회를 위해 실행 시마다 증가시킴
+    if 'visited' not in st.session_state:
+        today_visits += 1
+        total_visits += 1
+        st.session_state.visited = True
+        
+        # 저장
+        new_data = pd.DataFrame({'date': [today_str], 'today': [today_visits], 'total': [total_visits]})
+        new_data.to_csv(file_path, index=False)
+
+    return active_users, today_visits, total_visits
+
+# ---------------------------------------------------------
+# 1. 지표 계산 함수
 # ---------------------------------------------------------
 def calculate_indicators(df):
     if len(df) < 10: return df
@@ -250,8 +300,23 @@ def plot_chart(code, name, score_str, ref_info, trend_info):
 # 4. Streamlit Main UI
 # ---------------------------------------------------------
 def main():
+    # 사이드바 방문자 정보 표시 (최상단)
+    active_u, today_v, total_v = get_traffic_metrics()
+    
     st.sidebar.title("🚀 전설의 매매 Ver 25.11")
     
+    # 방문자 현황 카드
+    st.sidebar.markdown(f"""
+    <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
+        <h4 style="margin:0; color:#333;">📡 접속 현황</h4>
+        <p style="margin:5px 0 0 0;">🟢 <b>동시 접속자:</b> {active_u}명</p>
+        <p style="margin:0;">📅 <b>오늘 방문자:</b> {today_v}명</p>
+        <p style="margin:0;">👥 <b>누적 방문자:</b> {total_v}명</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.sidebar.markdown("---")
+
     # 사이드바 입력
     market_option = st.sidebar.selectbox("시장 선택", ["전체", "KOSPI", "KOSDAQ"], index=0)
     market_code = 'KOSPI' if market_option == 'KOSPI' else 'KOSDAQ' if market_option == 'KOSDAQ' else 'KRX'
@@ -261,6 +326,8 @@ def main():
     if max_price == 0: max_price = 9999999999
 
     st.sidebar.markdown("---")
+    
+    # 전략 리스트
     strategy_map = {
         "0. 🐣 단밤 돌파": "0", "1. 💎 최바닥주": "1", "2. 🚀 눌림목": "2",
         "3. 🏆 바닥+돌파": "3", "4. ⚡ 계단식": "4", "5. 📐 스나이퍼": "5",
@@ -271,13 +338,11 @@ def main():
 
     run_btn = st.sidebar.button("🔍 분석 시작", type="primary")
 
-    # 결과 저장을 위한 Session State
     if 'results' not in st.session_state:
         st.session_state.results = None
 
-    # 분석 실행 로직
     if run_btn:
-        st.session_state.results = None # 초기화
+        st.session_state.results = None
         with st.status("데이터 수집 및 분석 중... (잠시만 기다려주세요)", expanded=True) as status:
             try:
                 st.write("1. 전 종목 리스트 가져오는 중...")
@@ -299,7 +364,6 @@ def main():
                 res = []
                 workers = 20
                 
-                # 프로그레스 바
                 progress_bar = st.progress(0)
                 total_scan = len(target)
                 completed = 0
@@ -326,12 +390,10 @@ def main():
             except Exception as e:
                 st.error(f"오류 발생: {e}")
 
-    # 결과 화면 출력
     if st.session_state.results is not None:
         df_res = st.session_state.results
         st.success(f"🎯 총 {len(df_res)}개 종목이 발견되었습니다.")
         
-        # 1. 요약 테이블 보여주기 (인터랙티브)
         display_cols = ['시장', '종목명', '코드', '현재가', '등락률', '점수', '비고', '추천진입가', '목표가', '손절선']
         st.dataframe(
             df_res[display_cols].style.format({
@@ -345,16 +407,13 @@ def main():
         st.divider()
         st.subheader("📊 차트 상세 보기")
         
-        # 2. 차트 선택 UI (Selectbox가 모바일에서도 편함)
-        # 종목명과 코드를 합쳐서 선택지에 표시
         options = [f"{i}. [{row['시장']}] {row['종목명']} ({row['코드']})" for i, row in df_res.iterrows()]
         selected_option = st.selectbox("종목을 선택하세요:", options)
         
         if selected_option:
-            idx = int(selected_option.split('.')[0]) # 인덱스 추출
+            idx = int(selected_option.split('.')[0])
             row = df_res.loc[idx]
             
-            # 3. 상세 정보 및 차트 출력
             c1, c2, c3 = st.columns(3)
             c1.metric("현재가", f"{int(row['현재가']):,}원", f"{row['등락률']}%")
             c2.metric("추천 진입", f"{int(row['추천진입가']):,}원")
