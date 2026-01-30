@@ -11,75 +11,19 @@ import os
 import time
 
 # ---------------------------------------------------------
-# 0. 페이지 설정 및 CSS/JS (스크롤 버튼 수리 버전)
+# 0. 페이지 설정 및 CSS (버튼 삭제, 스크롤 최적화 유지)
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
 st.markdown("""
-    <script>
-        // 스크롤 강제 이동 함수 (부모 창 접근)
-        function forceScrollTop() {
-            try {
-                var target = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-                target.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch(e) {
-                console.log(e);
-            }
-        }
-        function forceScrollBottom() {
-            try {
-                var target = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-                target.scrollTo({ top: target.scrollHeight, behavior: 'smooth' });
-            } catch(e) {
-                console.log(e);
-            }
-        }
-    </script>
     <style>
-        /* 1. 모바일 당겨서 새로고침 방지 */
+        /* 모바일 당겨서 새로고침 방지 & 부드러운 스크롤 */
         [data-testid="stAppViewContainer"] {
-            overscroll-behavior-y: contain !important;
+            overscroll-behavior-y: none !important;
             overflow-y: auto !important;
-            scroll-behavior: smooth !important;
-        }
-
-        /* 2. 플로팅 버튼 스타일 */
-        .float-btn-group {
-            position: fixed;
-            bottom: 50px;
-            right: 20px;
-            z-index: 999999;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .float-btn {
-            width: 60px;
-            height: 60px;
-            background-color: #FF4B4B;
-            color: white;
-            border: 2px solid white;
-            border-radius: 50%;
-            font-size: 28px;
-            box-shadow: 0px 4px 8px rgba(0,0,0,0.4);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.1s, background-color 0.1s;
-        }
-        /* 버튼 눌렀을 때 효과 (클릭감) */
-        .float-btn:active {
-            transform: scale(0.9);
-            background-color: #D13535;
+            -webkit-overflow-scrolling: touch !important;
         }
     </style>
-
-    <!-- 3. 스크롤 버튼 (직접 함수 호출 방식) -->
-    <div class="float-btn-group">
-        <div class="float-btn" onclick="forceScrollTop()">⬆️</div>
-        <div class="float-btn" onclick="forceScrollBottom()">⬇️</div>
-    </div>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
@@ -343,7 +287,7 @@ def plot_chart(row):
 def main():
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.17")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.19")
     
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
