@@ -15,6 +15,16 @@ import time
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
+# [중요] 모바일 당겨서 새로고침(Pull-to-Refresh) 방지 CSS
+st.markdown("""
+    <style>
+        /* html과 body, 그리고 스트림릿 메인 컨테이너에 적용 */
+        html, body, [data-testid="stAppViewContainer"] {
+            overscroll-behavior-y: none !important;  /* 당겨서 새로고침 막기 */
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 @st.cache_resource
 def set_korean_font():
     # 1. 현재 폴더에 있는 폰트 파일 우선 적용
@@ -32,7 +42,7 @@ def set_korean_font():
 set_korean_font()
 
 # ---------------------------------------------------------
-# [추가] 방문자 수 및 동시 접속자 집계 함수
+# [기능] 방문자 수 및 동시 접속자 집계 함수
 # ---------------------------------------------------------
 def get_traffic_metrics():
     # 1. 동시 접속자 수 (Streamlit Runtime 접근)
@@ -48,7 +58,6 @@ def get_traffic_metrics():
     file_path = "visitors.csv"
     today_str = datetime.now().strftime("%Y-%m-%d")
     
-    # 기본값
     total_visits = 0
     today_visits = 0
     
@@ -67,9 +76,7 @@ def get_traffic_metrics():
         except:
             pass
             
-    # 카운트 증가 (새로고침 할 때마다 증가)
-    # Session State를 써서 한 세션 내에서는 증가 안 하게 할 수도 있지만, 
-    # 여기서는 단순 조회를 위해 실행 시마다 증가시킴
+    # 카운트 증가
     if 'visited' not in st.session_state:
         today_visits += 1
         total_visits += 1
@@ -300,12 +307,11 @@ def plot_chart(code, name, score_str, ref_info, trend_info):
 # 4. Streamlit Main UI
 # ---------------------------------------------------------
 def main():
-    # 사이드바 방문자 정보 표시 (최상단)
+    # 방문자 정보 표시
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.11")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.12")
     
-    # 방문자 현황 카드
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
         <h4 style="margin:0; color:#333;">📡 접속 현황</h4>
@@ -317,7 +323,6 @@ def main():
     
     st.sidebar.markdown("---")
 
-    # 사이드바 입력
     market_option = st.sidebar.selectbox("시장 선택", ["전체", "KOSPI", "KOSDAQ"], index=0)
     market_code = 'KOSPI' if market_option == 'KOSPI' else 'KOSDAQ' if market_option == 'KOSDAQ' else 'KRX'
 
@@ -327,7 +332,6 @@ def main():
 
     st.sidebar.markdown("---")
     
-    # 전략 리스트
     strategy_map = {
         "0. 🐣 단밤 돌파": "0", "1. 💎 최바닥주": "1", "2. 🚀 눌림목": "2",
         "3. 🏆 바닥+돌파": "3", "4. ⚡ 계단식": "4", "5. 📐 스나이퍼": "5",
