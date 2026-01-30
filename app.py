@@ -11,62 +11,68 @@ import os
 import time
 
 # ---------------------------------------------------------
-# 0. 페이지 설정 및 CSS (스크롤 버튼 & 새로고침 방지)
+# 0. 페이지 설정 및 CSS (스크롤 버튼 강력 수정)
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
 st.markdown("""
+    <script>
+        function scroll_top() {
+            var body = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+            body.scrollTop = 0;
+        }
+        function scroll_bottom() {
+            var body = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+            body.scrollTop = body.scrollHeight;
+        }
+    </script>
     <style>
         /* 1. 모바일 당겨서 새로고침 방지 & 스크롤 부드럽게 */
         [data-testid="stAppViewContainer"] {
             overscroll-behavior-y: contain !important;
-            overflow-y: auto;
-            scroll-behavior: smooth;
+            overflow-y: auto !important;
+            scroll-behavior: smooth !important;
         }
 
         /* 2. 우측 하단 플로팅 스크롤 버튼 스타일 */
         .float-btn-group {
             position: fixed;
-            bottom: 30px;
+            bottom: 40px;
             right: 20px;
-            z-index: 9999;
+            z-index: 99999; /* 제일 위에 표시 */
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 15px;
         }
         .float-btn {
-            width: 50px;
-            height: 50px;
-            background-color: #ff4b4b; /* 스트림릿 포인트 컬러 */
+            width: 55px;
+            height: 55px;
+            background-color: #FF4B4B; /* 빨간색 */
             color: white;
-            border: none;
+            border: 2px solid white;
             border-radius: 50%;
             font-size: 24px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
             cursor: pointer;
             text-align: center;
             line-height: 50px;
-            opacity: 0.8;
-            transition: opacity 0.3s;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-        .float-btn:hover {
-            opacity: 1.0;
-        }
-        /* 모바일에서 터치하기 편하게 */
-        @media (max-width: 768px) {
-            .float-btn {
-                width: 60px;
-                height: 60px;
-                line-height: 60px;
-                font-size: 28px;
-            }
+        .float-btn:active {
+            background-color: #D63E3E;
+            transform: scale(0.95);
         }
     </style>
 
-    <!-- 3. 스크롤 버튼 HTML/JS -->
+    <!-- 3. 스크롤 버튼 (자바스크립트 직접 실행 방식) -->
     <div class="float-btn-group">
-        <div class="float-btn" onclick="document.querySelector('[data-testid=stAppViewContainer]').scrollTo(0,0)">⬆️</div>
-        <div class="float-btn" onclick="document.querySelector('[data-testid=stAppViewContainer]').scrollTo(0, document.querySelector('[data-testid=stAppViewContainer]').scrollHeight)">⬇️</div>
+        <div class="float-btn" onclick="parent.document.querySelector('[data-testid=stAppViewContainer]').scrollTo({top:0, behavior:'smooth'})">⬆️</div>
+        <div class="float-btn" onclick="parent.document.querySelector('[data-testid=stAppViewContainer]').scrollTo({top:999999, behavior:'smooth'})">⬇️</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -275,7 +281,7 @@ def analyze_stock(row, strategy_mode):
     except: return None
 
 # ---------------------------------------------------------
-# 3. 차트 시각화 (목표/손절 라인 추가됨)
+# 3. 차트 시각화 (목표/손절 라인 포함)
 # ---------------------------------------------------------
 def plot_chart(row):
     try:
@@ -294,15 +300,15 @@ def plot_chart(row):
         ax1.plot(plot_df.index, plot_df['MA112'], color='blue', linestyle='-', linewidth=1.5, label='112일선')
         ax1.plot(plot_df.index, plot_df['Black_Line'], color='black', linestyle='-', alpha=0.7, label='검은선')
         
-        # 목표가 라인 (빨강 점선)
+        # 목표가 (빨강 점선)
         if target_p > 0:
             ax1.axhline(y=target_p, color='#FF5733', linestyle='--', linewidth=1.5, label='목표가')
-            ax1.text(last_date, target_p, f" 목표 {int(target_p):,}", color='#FF5733', fontweight='bold', va='bottom')
+            ax1.text(last_date, target_p, f" 목 {int(target_p):,}", color='#FF5733', fontweight='bold', va='bottom')
 
-        # 손절가 라인 (파랑 점선)
+        # 손절가 (파랑 점선)
         if stop_l > 0:
             ax1.axhline(y=stop_l, color='#3357FF', linestyle='--', linewidth=1.5, label='손절가')
-            ax1.text(last_date, stop_l, f" 손절 {int(stop_l):,}", color='#3357FF', fontweight='bold', va='top')
+            ax1.text(last_date, stop_l, f" 손 {int(stop_l):,}", color='#3357FF', fontweight='bold', va='top')
 
         if ref_info:
             r_date = ref_info['date']
@@ -331,7 +337,7 @@ def plot_chart(row):
 def main():
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.15")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.16")
     
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
