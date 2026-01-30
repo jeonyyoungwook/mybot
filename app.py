@@ -11,20 +11,63 @@ import os
 import time
 
 # ---------------------------------------------------------
-# 0. 페이지 설정 및 폰트 설정
+# 0. 페이지 설정 및 CSS (스크롤 버튼 & 새로고침 방지)
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
-# [수정됨] 모바일 스크롤 잠김 해결 + 새로고침 방지 CSS
 st.markdown("""
     <style>
-        /* html, body에는 적용하지 않음 (스크롤 잠김 방지) */
-        /* 앱 내용이 담긴 컨테이너에만 적용 */
+        /* 1. 모바일 당겨서 새로고침 방지 & 스크롤 부드럽게 */
         [data-testid="stAppViewContainer"] {
-            overscroll-behavior-y: contain !important; /* 당겨서 새로고침 막기 */
-            overflow-y: auto; /* 스크롤 허용 */
+            overscroll-behavior-y: contain !important;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        /* 2. 우측 하단 플로팅 스크롤 버튼 스타일 */
+        .float-btn-group {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .float-btn {
+            width: 50px;
+            height: 50px;
+            background-color: #ff4b4b; /* 스트림릿 포인트 컬러 */
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+            text-align: center;
+            line-height: 50px;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        .float-btn:hover {
+            opacity: 1.0;
+        }
+        /* 모바일에서 터치하기 편하게 */
+        @media (max-width: 768px) {
+            .float-btn {
+                width: 60px;
+                height: 60px;
+                line-height: 60px;
+                font-size: 28px;
+            }
         }
     </style>
+
+    <!-- 3. 스크롤 버튼 HTML/JS -->
+    <div class="float-btn-group">
+        <div class="float-btn" onclick="document.querySelector('[data-testid=stAppViewContainer]').scrollTo(0,0)">⬆️</div>
+        <div class="float-btn" onclick="document.querySelector('[data-testid=stAppViewContainer]').scrollTo(0, document.querySelector('[data-testid=stAppViewContainer]').scrollHeight)">⬇️</div>
+    </div>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
@@ -41,10 +84,9 @@ def set_korean_font():
 set_korean_font()
 
 # ---------------------------------------------------------
-# [기능] 방문자 수 및 동시 접속자 집계 함수
+# [기능] 방문자 수 및 동시 접속자 집계
 # ---------------------------------------------------------
 def get_traffic_metrics():
-    # 1. 동시 접속자 수 집계 (강력한 버전)
     active_users = 1
     try:
         from streamlit.runtime import get_instance
@@ -52,22 +94,12 @@ def get_traffic_metrics():
         if runtime:
             active_users = len(runtime._session_manager._session_info_map)
     except Exception:
-        try:
-            from streamlit.web.server.server import Server
-            server = Server.get_current()
-            if server:
-                active_users = len(server._session_info_by_id)
-        except Exception:
-            active_users = 1
-
+        active_users = 1
     if active_users < 1: active_users = 1
 
-    # 2. 방문자 수 기록 (CSV 파일 사용)
     file_path = "visitors.csv"
     today_str = datetime.now().strftime("%Y-%m-%d")
-    
-    total_visits = 0
-    today_visits = 0
+    total_visits = 0; today_visits = 0
     
     if os.path.exists(file_path):
         try:
@@ -76,17 +108,12 @@ def get_traffic_metrics():
                 last_date = df_v.iloc[-1]['date']
                 total_visits = int(df_v.iloc[-1]['total'])
                 today_visits = int(df_v.iloc[-1]['today'])
-                
-                if last_date != today_str:
-                    today_visits = 0
-        except:
-            pass
+                if last_date != today_str: today_visits = 0
+        except: pass
             
     if 'visited' not in st.session_state:
-        today_visits += 1
-        total_visits += 1
+        today_visits += 1; total_visits += 1
         st.session_state.visited = True
-        
         new_data = pd.DataFrame({'date': [today_str], 'today': [today_visits], 'total': [total_visits]})
         new_data.to_csv(file_path, index=False)
 
@@ -104,51 +131,41 @@ def calculate_indicators(df):
     df['MA112'] = df['Close'].rolling(window=112).mean()
     df['Blue_Line'] = df['Low'].rolling(window=60).min()
     
-    high_shift = df['High'].shift(1)
-    low_shift = df['Low'].shift(1)
-    h12 = high_shift.rolling(12).max()
-    l12 = low_shift.rolling(12).min()
-    df['Black_Line'] = (h12 + l12) / 2
+    high_shift = df['High'].shift(1); low_shift = df['Low'].shift(1)
+    df['Black_Line'] = (high_shift.rolling(12).max() + low_shift.rolling(12).min()) / 2
     
-    h20 = high_shift.rolling(20).max()
-    l20 = low_shift.rolling(20).min()
+    h20 = high_shift.rolling(20).max(); l20 = low_shift.rolling(20).min()
     df['Gray_Line'] = l20 + (h20 - l20) * 0.618
     return df
 
 def calculate_adx_simple(df, n=14):
-    plus_dm = df['High'].diff()
-    minus_dm = df['Low'].diff()
+    plus_dm = df['High'].diff(); minus_dm = df['Low'].diff()
     plus_dm = np.where((plus_dm > minus_dm) & (plus_dm > 0), plus_dm, 0.0)
     minus_dm = np.where((minus_dm > plus_dm) & (minus_dm > 0), -minus_dm, 0.0)
     
-    tr = pd.concat([df['High'] - df['Low'],
-                    abs(df['High'] - df['Close'].shift(1)),
-                    abs(df['Low'] - df['Close'].shift(1))], axis=1).max(axis=1)
-    
+    tr = pd.concat([df['High'] - df['Low'], abs(df['High'] - df['Close'].shift(1)), abs(df['Low'] - df['Close'].shift(1))], axis=1).max(axis=1)
     atr = tr.ewm(alpha=1/n, adjust=False).mean()
     plus_di = 100 * (pd.Series(plus_dm, index=df.index).ewm(alpha=1/n, adjust=False).mean() / atr)
     minus_di = 100 * (pd.Series(minus_dm, index=df.index).abs().ewm(alpha=1/n, adjust=False).mean() / atr)
-    div = plus_di + minus_di
-    dx = (abs(plus_di - minus_di) / div.replace(0, 1)) * 100
-    return dx.ewm(alpha=1/n, adjust=False).mean()
+    return (abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, 1) * 100).ewm(alpha=1/n, adjust=False).mean()
 
 def get_trend_breakout(df):
     try:
         if len(df) < 130: return None
         window = df.iloc[-180:-5]
         if len(window) < 30: return None
-        p1 = window['High'].idxmax()
-        p1_val = window.loc[p1]['High']
-        days_diff = (window.index[-1] - p1).days
-        if days_diff < 30: return None
+        p1 = window['High'].idxmax(); p1_val = window.loc[p1]['High']
+        if (window.index[-1] - p1).days < 30: return None
+        
         after_p1 = window.loc[p1:].iloc[15:]
         if len(after_p1) < 10: return None
-        p2 = after_p1['High'].idxmax()
-        p2_val = after_p1.loc[p2]['High']
+        p2 = after_p1['High'].idxmax(); p2_val = after_p1.loc[p2]['High']
+        
         if p2_val >= p1_val: return None
         slope = (p2_val - p1_val) / (p2 - p1).days
         res_price = p1_val + (slope * (df.index[-1] - p1).days)
         curr = df['Close'].iloc[-1]
+        
         if curr <= res_price: return None
         if (curr - res_price)/res_price > 0.05: return None
         return {'p1_date': p1, 'p1_val': p1_val, 'resistance': res_price}
@@ -167,20 +184,14 @@ def analyze_stock(row, strategy_mode):
         else: days_to_fetch = 250
         
         df = fdr.DataReader(code, (datetime.now()-timedelta(days=days_to_fetch)))
-        
-        min_len = 20
-        if strategy_mode == '8': min_len = 120
-        
+        min_len = 120 if strategy_mode == '8' else 20
         if len(df) < min_len or df['Volume'].iloc[-1] == 0: return None
 
         df = calculate_indicators(df)
         curr = df['Close'].iloc[-1]
-        
-        if strategy_mode == '6':
-            df['ADX'] = calculate_adx_simple(df)
+        if strategy_mode == '6': df['ADX'] = calculate_adx_simple(df)
 
-        rec_entry = 0; stop_loss = 0; target_price = 0
-        ref_candle_info = None
+        rec_entry = 0; stop_loss = 0; target_price = 0; ref_candle_info = None
         
         scan_df = df.iloc[-45:-2] 
         for idx_label in reversed(scan_df.index):
@@ -218,8 +229,7 @@ def analyze_stock(row, strategy_mode):
             t = df.iloc[-1]
             if t['Close'] <= t['Open']: return None
             if (t['High'] - t['Close']) > (t['Close'] - t['Open']) * 2: return None
-            score_str = "🔥급등주"
-            rec_entry = int(t['Open'])
+            score_str = "🔥급등주"; rec_entry = int(t['Open'])
         elif strategy_mode == '6':
             t = df.iloc[-1]
             if pd.isna(t['MA88']): return None
@@ -243,19 +253,16 @@ def analyze_stock(row, strategy_mode):
             gap = (curr - df['MA20'].iloc[-1]) / df['MA20'].iloc[-1]
             if not (-0.02 <= gap <= 0.04): return None
             score_str = "🚀눌림목"
-        elif strategy_mode == '1':
-            score_str = "💎최바닥주"
+        elif strategy_mode == '1': score_str = "💎최바닥주"
         elif strategy_mode == '0':
             t = df.iloc[-1]; y = df.iloc[-2]
             if pd.isna(t['Black_Line']): return None
-            if (y['Close'] < y['Black_Line']) and (t['Close'] > t['Black_Line']):
-               score_str = "🐣단밤돌파"
+            if (y['Close'] < y['Black_Line']) and (t['Close'] > t['Black_Line']): score_str = "🐣단밤돌파"
             else: return None
         else: return None
 
         if ref_candle_info: note_str = f"기준봉({ref_candle_info['date'].strftime('%m/%d')}) 중심"
         else: note_str = "기준봉없음"
-
         if rec_entry > 0 and (curr - rec_entry) / rec_entry > 0.20: return None
 
         return {
@@ -268,17 +275,18 @@ def analyze_stock(row, strategy_mode):
     except: return None
 
 # ---------------------------------------------------------
-# 3. 차트 시각화
+# 3. 차트 시각화 (목표/손절 라인 추가됨)
 # ---------------------------------------------------------
-def plot_chart(code, name, score_str, ref_info, trend_info):
+def plot_chart(row):
     try:
+        code = row['코드']; name = row['종목명']; score_str = row['점수']
+        ref_info = row['ref_info']; trend_info = row.get('trend_info')
+        target_p = row['목표가']; stop_l = row['손절선']
+        
         set_korean_font()
         df = fdr.DataReader(code, (datetime.now()-timedelta(days=500)))
         df = calculate_indicators(df)
-
-        if len(df) > 250: plot_df = df.iloc[-250:]
-        else: plot_df = df
-
+        plot_df = df.iloc[-250:] if len(df) > 250 else df
         last_date = plot_df.index[-1]; curr = plot_df['Close'].iloc[-1]
 
         fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -286,16 +294,26 @@ def plot_chart(code, name, score_str, ref_info, trend_info):
         ax1.plot(plot_df.index, plot_df['MA112'], color='blue', linestyle='-', linewidth=1.5, label='112일선')
         ax1.plot(plot_df.index, plot_df['Black_Line'], color='black', linestyle='-', alpha=0.7, label='검은선')
         
+        # 목표가 라인 (빨강 점선)
+        if target_p > 0:
+            ax1.axhline(y=target_p, color='#FF5733', linestyle='--', linewidth=1.5, label='목표가')
+            ax1.text(last_date, target_p, f" 목표 {int(target_p):,}", color='#FF5733', fontweight='bold', va='bottom')
+
+        # 손절가 라인 (파랑 점선)
+        if stop_l > 0:
+            ax1.axhline(y=stop_l, color='#3357FF', linestyle='--', linewidth=1.5, label='손절가')
+            ax1.text(last_date, stop_l, f" 손절 {int(stop_l):,}", color='#3357FF', fontweight='bold', va='top')
+
         if ref_info:
             r_date = ref_info['date']
             if r_date in plot_df.index:
                 mid = ref_info['mid']
                 ax1.axvline(x=r_date, color='orange', linestyle='--', alpha=0.5)
-                ax1.axhline(y=mid, color='red', linestyle='-', linewidth=2, label=f'타점(중심): {int(mid):,}')
-                ax1.text(plot_df.index[-1], mid, f" BUY: {int(mid):,}", color='red', fontweight='bold', ha='left')
+                ax1.axhline(y=mid, color='red', linestyle='-', linewidth=1, label=f'타점: {int(mid):,}')
+                ax1.text(last_date, mid, f" BUY: {int(mid):,}", color='red', fontweight='bold', ha='left')
 
         if trend_info:
-             ax1.plot([trend_info['p1_date'], last_date], [trend_info['p1_val'], trend_info['resistance']], color='purple', linewidth=2, label='추세저항선')
+             ax1.plot([trend_info['p1_date'], last_date], [trend_info['p1_val'], trend_info['resistance']], color='purple', linewidth=2, label='추세저항')
 
         ax1.scatter(last_date, curr, color='red', s=150, zorder=10)
         ax1.set_title(f"{name} ({code}) - {score_str}", fontsize=15, fontweight='bold')
@@ -313,7 +331,7 @@ def plot_chart(code, name, score_str, ref_info, trend_info):
 def main():
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.14")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.15")
     
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
@@ -323,7 +341,6 @@ def main():
         <p style="margin:0;">👥 <b>누적 방문자:</b> {total_v}명</p>
     </div>
     """, unsafe_allow_html=True)
-    
     st.sidebar.markdown("---")
 
     market_option = st.sidebar.selectbox("시장 선택", ["전체", "KOSPI", "KOSDAQ"], index=0)
@@ -332,7 +349,6 @@ def main():
     min_price = st.sidebar.number_input("최소 주가", value=1000, step=100)
     max_price = st.sidebar.number_input("최대 주가 (0=무제한)", value=0, step=1000)
     if max_price == 0: max_price = 9999999999
-
     st.sidebar.markdown("---")
     
     strategy_map = {
@@ -381,8 +397,7 @@ def main():
                         completed += 1
                         if completed % 50 == 0:
                             progress_bar.progress(completed / total_scan)
-                        if r := f.result():
-                            res.append(r)
+                        if r := f.result(): res.append(r)
                 
                 progress_bar.progress(1.0)
                 
@@ -393,7 +408,6 @@ def main():
                     status.update(label="분석 완료!", state="complete", expanded=False)
                 else:
                     status.update(label="검색 결과가 없습니다.", state="error")
-            
             except Exception as e:
                 st.error(f"오류 발생: {e}")
 
@@ -429,7 +443,7 @@ def main():
             st.info(f"💡 상태: {row['점수']} | {row['비고']}")
             
             with st.spinner("차트 그리는 중..."):
-                plot_chart(row['코드'], row['종목명'], row['점수'], row['ref_info'], row.get('trend_info'))
+                plot_chart(row)
 
 if __name__ == "__main__":
     main()
