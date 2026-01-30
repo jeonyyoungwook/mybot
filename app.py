@@ -11,68 +11,74 @@ import os
 import time
 
 # ---------------------------------------------------------
-# 0. 페이지 설정 및 CSS (스크롤 버튼 강력 수정)
+# 0. 페이지 설정 및 CSS/JS (스크롤 버튼 수리 버전)
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
 st.markdown("""
     <script>
-        function scroll_top() {
-            var body = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-            body.scrollTop = 0;
+        // 스크롤 강제 이동 함수 (부모 창 접근)
+        function forceScrollTop() {
+            try {
+                var target = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+                target.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch(e) {
+                console.log(e);
+            }
         }
-        function scroll_bottom() {
-            var body = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-            body.scrollTop = body.scrollHeight;
+        function forceScrollBottom() {
+            try {
+                var target = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+                target.scrollTo({ top: target.scrollHeight, behavior: 'smooth' });
+            } catch(e) {
+                console.log(e);
+            }
         }
     </script>
     <style>
-        /* 1. 모바일 당겨서 새로고침 방지 & 스크롤 부드럽게 */
+        /* 1. 모바일 당겨서 새로고침 방지 */
         [data-testid="stAppViewContainer"] {
             overscroll-behavior-y: contain !important;
             overflow-y: auto !important;
             scroll-behavior: smooth !important;
         }
 
-        /* 2. 우측 하단 플로팅 스크롤 버튼 스타일 */
+        /* 2. 플로팅 버튼 스타일 */
         .float-btn-group {
             position: fixed;
-            bottom: 40px;
+            bottom: 50px;
             right: 20px;
-            z-index: 99999; /* 제일 위에 표시 */
+            z-index: 999999;
             display: flex;
             flex-direction: column;
             gap: 15px;
         }
         .float-btn {
-            width: 55px;
-            height: 55px;
-            background-color: #FF4B4B; /* 빨간색 */
+            width: 60px;
+            height: 60px;
+            background-color: #FF4B4B;
             color: white;
             border: 2px solid white;
             border-radius: 50%;
-            font-size: 24px;
-            box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
+            font-size: 28px;
+            box-shadow: 0px 4px 8px rgba(0,0,0,0.4);
             cursor: pointer;
-            text-align: center;
-            line-height: 50px;
-            font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s, background-color 0.1s;
         }
+        /* 버튼 눌렀을 때 효과 (클릭감) */
         .float-btn:active {
-            background-color: #D63E3E;
-            transform: scale(0.95);
+            transform: scale(0.9);
+            background-color: #D13535;
         }
     </style>
 
-    <!-- 3. 스크롤 버튼 (자바스크립트 직접 실행 방식) -->
+    <!-- 3. 스크롤 버튼 (직접 함수 호출 방식) -->
     <div class="float-btn-group">
-        <div class="float-btn" onclick="parent.document.querySelector('[data-testid=stAppViewContainer]').scrollTo({top:0, behavior:'smooth'})">⬆️</div>
-        <div class="float-btn" onclick="parent.document.querySelector('[data-testid=stAppViewContainer]').scrollTo({top:999999, behavior:'smooth'})">⬇️</div>
+        <div class="float-btn" onclick="forceScrollTop()">⬆️</div>
+        <div class="float-btn" onclick="forceScrollBottom()">⬇️</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -337,7 +343,7 @@ def plot_chart(row):
 def main():
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.16")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.17")
     
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
