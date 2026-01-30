@@ -15,28 +15,27 @@ import time
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 (Web)", layout="wide")
 
-# [중요] 모바일 당겨서 새로고침(Pull-to-Refresh) 방지 CSS
+# [수정됨] 모바일 스크롤 잠김 해결 + 새로고침 방지 CSS
 st.markdown("""
     <style>
-        /* html과 body, 그리고 스트림릿 메인 컨테이너에 적용 */
-        html, body, [data-testid="stAppViewContainer"] {
-            overscroll-behavior-y: none !important;  /* 당겨서 새로고침 막기 */
+        /* html, body에는 적용하지 않음 (스크롤 잠김 방지) */
+        /* 앱 내용이 담긴 컨테이너에만 적용 */
+        [data-testid="stAppViewContainer"] {
+            overscroll-behavior-y: contain !important; /* 당겨서 새로고침 막기 */
+            overflow-y: auto; /* 스크롤 허용 */
         }
     </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
 def set_korean_font():
-    # 1. 현재 폴더에 있는 폰트 파일 우선 적용
     font_path = 'NanumGothic.ttf' 
     if os.path.exists(font_path):
         fm.fontManager.addfont(font_path)
         font_prop = fm.FontProperties(fname=font_path)
         plt.rc('font', family=font_prop.get_name())
     else:
-        # 2. 파일이 없으면 시스템 폰트 시도
         plt.rc('font', family='NanumGothic')
-    
     plt.rcParams['axes.unicode_minus'] = False
 
 set_korean_font()
@@ -45,14 +44,23 @@ set_korean_font()
 # [기능] 방문자 수 및 동시 접속자 집계 함수
 # ---------------------------------------------------------
 def get_traffic_metrics():
-    # 1. 동시 접속자 수 (Streamlit Runtime 접근)
+    # 1. 동시 접속자 수 집계 (강력한 버전)
+    active_users = 1
     try:
         from streamlit.runtime import get_instance
         runtime = get_instance()
-        session_info = runtime._session_manager._session_info_map
-        active_users = len(session_info)
-    except:
-        active_users = 1 # 오류 시 기본값
+        if runtime:
+            active_users = len(runtime._session_manager._session_info_map)
+    except Exception:
+        try:
+            from streamlit.web.server.server import Server
+            server = Server.get_current()
+            if server:
+                active_users = len(server._session_info_by_id)
+        except Exception:
+            active_users = 1
+
+    if active_users < 1: active_users = 1
 
     # 2. 방문자 수 기록 (CSV 파일 사용)
     file_path = "visitors.csv"
@@ -61,7 +69,6 @@ def get_traffic_metrics():
     total_visits = 0
     today_visits = 0
     
-    # 파일이 있으면 읽기
     if os.path.exists(file_path):
         try:
             df_v = pd.read_csv(file_path)
@@ -70,19 +77,16 @@ def get_traffic_metrics():
                 total_visits = int(df_v.iloc[-1]['total'])
                 today_visits = int(df_v.iloc[-1]['today'])
                 
-                # 날짜가 바뀌었으면 오늘 방문자 초기화
                 if last_date != today_str:
                     today_visits = 0
         except:
             pass
             
-    # 카운트 증가
     if 'visited' not in st.session_state:
         today_visits += 1
         total_visits += 1
         st.session_state.visited = True
         
-        # 저장
         new_data = pd.DataFrame({'date': [today_str], 'today': [today_visits], 'total': [total_visits]})
         new_data.to_csv(file_path, index=False)
 
@@ -307,10 +311,9 @@ def plot_chart(code, name, score_str, ref_info, trend_info):
 # 4. Streamlit Main UI
 # ---------------------------------------------------------
 def main():
-    # 방문자 정보 표시
     active_u, today_v, total_v = get_traffic_metrics()
     
-    st.sidebar.title("🚀 전설의 매매 Ver 25.12")
+    st.sidebar.title("🚀 전설의 매매 Ver 25.14")
     
     st.sidebar.markdown(f"""
     <div style="background-color:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:10px;">
