@@ -15,7 +15,6 @@ import json
 # 1. 방문자 수 카운트 & 상태 표시 로직
 # ---------------------------------------------------------
 def track_visitors():
-    """방문자 수를 JSON 파일로 관리하여 카운팅"""
     filename = 'visitors.json'
     today_str = datetime.now().strftime('%Y-%m-%d')
     
@@ -318,7 +317,7 @@ def analyze_stock(row, strategy_mode):
         return None
 
 # ---------------------------------------------------------
-# 5. 차트 그리기 함수 (수정됨: 텍스트 왼쪽으로 이동)
+# 5. 차트 그리기 함수
 # ---------------------------------------------------------
 def draw_chart(code, name, score_str, target_price, stop_loss):
     try:
@@ -343,18 +342,14 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
             ax.plot(plot_df.index, plot_df['MA224'], color='#555555', linewidth=3, label='224일선')
 
         # 3. 목표가/손절선 (선 + 텍스트)
-        # 선 그리기
         ax.axhline(y=target_price, color='red', linestyle=':', linewidth=2)
         ax.axhline(y=stop_loss, color='blue', linestyle=':', linewidth=2)
 
-        # 텍스트 그리기 (가장 왼쪽 날짜 기준)
-        start_date = plot_df.index[0] # 시작 날짜 (왼쪽)
+        start_date = plot_df.index[0] # 왼쪽 정렬을 위해 시작 날짜 사용
         
-        # 목표가 텍스트 (빨간색, 왼쪽 정렬, 선 바로 위)
         ax.text(start_date, target_price, f' 목표가 {int(target_price):,} ', 
                 color='red', fontsize=11, fontweight='bold', ha='left', va='bottom', fontproperties=FONT_PROP)
         
-        # 손절선 텍스트 (파란색, 왼쪽 정렬, 선 바로 아래)
         ax.text(start_date, stop_loss, f' 손절선 {int(stop_loss):,} ', 
                 color='blue', fontsize=11, fontweight='bold', ha='left', va='top', fontproperties=FONT_PROP)
 
@@ -432,7 +427,6 @@ with col3:
 
 st.markdown("---")
 
-# 종목 스캔 버튼 로직
 if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
     mode = strategy_option.split(":")[0] 
     market_code = "KOSPI" if market_option == "KOSPI" else "KOSDAQ" if market_option == "KOSDAQ" else "KRX"
@@ -475,67 +469,57 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         else:
             status_text.success(f"✨ {len(res)}개 종목 발견 완료!")
             df_r = pd.DataFrame(res).sort_values('등락률', ascending=False).reset_index(drop=True)
-            
             st.session_state['scan_result'] = df_r
 
     except Exception as e:
         status_text.error(f"오류 발생: {e}")
 
 # ---------------------------------------------------------
-# 결과 표시 및 차트 인터랙션
+# 결과 표시 (차트 상단, 리스트 하단 구조)
 # ---------------------------------------------------------
 if 'scan_result' in st.session_state:
     df_r = st.session_state['scan_result']
     
-    st.markdown("### 📋 검색된 종목 리스트")
-    st.info("👇 리스트에서 종목을 클릭하면 아래에 상세 차트가 나타납니다.")
+    # 1. 차트가 들어갈 자리(상단)를 미리 확보 (Container)
+    chart_container = st.container()
 
-    # 1. 데이터프레임 표시 (on_select 활성화)
+    # 2. 종목 리스트 표시 (하단)
+    st.markdown("### 📋 검색된 종목 리스트")
+    st.info("👇 리스트에서 종목을 클릭하면 **바로 위 상단**에 차트가 나타납니다.")
+
     event = st.dataframe(
         df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
         use_container_width=True,
-        on_select="rerun",           # 선택 시 리런
-        selection_mode="single-row", # 한 번에 한 줄만 선택
-        hide_index=True              # 인덱스 숨김 (깔끔하게)
+        on_select="rerun",
+        selection_mode="single-row",
+        hide_index=True,
+        height=400 # 모바일에서 너무 길지 않게 고정
     )
 
-    st.markdown("---")
-
-    # 2. 선택된 행이 있는지 확인 후 차트 그리기
+    # 3. 선택 이벤트 발생 시 -> 상단 Container에 차트 그리기
     if len(event.selection.rows) > 0:
         selected_index = event.selection.rows[0]
         selected_row = df_r.iloc[selected_index]
         
-        st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
-        
-        # 정보 표시
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
-        c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
-        c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
-        c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
-        
-        # 차트 로딩 및 표시
-        with st.spinner(f"{selected_row['종목명']} 차트 불러오는 중..."):
-            fig = draw_chart(
-                selected_row['코드'], 
-                selected_row['종목명'], 
-                selected_row['점수'], 
-                selected_row['목표가'], 
-                selected_row['손절선']
-            )
+        with chart_container:
+            st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
             
-            if fig:
-                st.pyplot(fig)
-                st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
-            else:
-                st.error("차트 데이터를 불러오는데 실패했습니다.")
-    
-    else:
-        st.markdown(
-            """
-            <div style="text-align:center; padding: 50px; color:gray; background-color:#f9f9f9; border-radius:10px;">
-                👆 위 목록에서 차트를 보고 싶은 종목을 클릭하세요.
-            </div>
-            """, unsafe_allow_html=True
-        )
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
+            c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
+            c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
+            c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
+            
+            with st.spinner("차트 로딩 중..."):
+                fig = draw_chart(
+                    selected_row['코드'], 
+                    selected_row['종목명'], 
+                    selected_row['점수'], 
+                    selected_row['목표가'], 
+                    selected_row['손절선']
+                )
+                if fig:
+                    st.pyplot(fig)
+                    st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
+            
+            st.markdown("---") # 차트와 리스트 사이 구분선
