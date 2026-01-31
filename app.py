@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components # 스크롤 제어를 위해 추가
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import FinanceDataReader as fdr
@@ -13,7 +13,46 @@ import platform
 import json
 
 # ---------------------------------------------------------
-# 1. 방문자 수 카운트 & 상태 표시 로직
+# 1. 폰트 및 페이지 설정 & 모바일 새로고침 방지
+# ---------------------------------------------------------
+st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", layout="wide")
+
+# [핵심] 모바일에서 당겨서 새로고침(리셋) 방지 CSS 적용
+st.markdown("""
+    <style>
+        /* 전체 페이지 및 메인 컨테이너에서 오버스크롤(당겨서 새로고침) 방지 */
+        html, body, [data-testid="stAppViewContainer"] {
+            overscroll-behavior-y: none !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+def set_font_force():
+    system_name = platform.system()
+    f_path = ''
+    if system_name == 'Linux':
+        f_path = '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf'
+        if not os.path.exists(f_path):
+            f_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+    elif system_name == 'Windows':
+        f_path = 'C:/Windows/Fonts/malgun.ttf'
+    elif system_name == 'Darwin':
+        f_path = '/System/Library/Fonts/AppleSDGothicNeo.ttc'
+
+    if os.path.exists(f_path):
+        fm.fontManager.addfont(f_path)
+        font_prop = fm.FontProperties(fname=f_path)
+        plt.rc('font', family=font_prop.get_name())
+        plt.rcParams['axes.unicode_minus'] = False
+        return font_prop
+    else:
+        plt.rc('font', family='sans-serif')
+        return None
+
+FONT_PROP = set_font_force()
+
+# ---------------------------------------------------------
+# 2. 방문자 수 카운트
 # ---------------------------------------------------------
 def track_visitors():
     filename = 'visitors.json'
@@ -41,35 +80,6 @@ def track_visitors():
             json.dump(data, f)
             
     return data['today'], data['total']
-
-# ---------------------------------------------------------
-# 2. 폰트 및 페이지 설정
-# ---------------------------------------------------------
-st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", layout="wide")
-
-def set_font_force():
-    system_name = platform.system()
-    f_path = ''
-    if system_name == 'Linux':
-        f_path = '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf'
-        if not os.path.exists(f_path):
-            f_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
-    elif system_name == 'Windows':
-        f_path = 'C:/Windows/Fonts/malgun.ttf'
-    elif system_name == 'Darwin':
-        f_path = '/System/Library/Fonts/AppleSDGothicNeo.ttc'
-
-    if os.path.exists(f_path):
-        fm.fontManager.addfont(f_path)
-        font_prop = fm.FontProperties(fname=f_path)
-        plt.rc('font', family=font_prop.get_name())
-        plt.rcParams['axes.unicode_minus'] = False
-        return font_prop
-    else:
-        plt.rc('font', family='sans-serif')
-        return None
-
-FONT_PROP = set_font_force()
 
 # ---------------------------------------------------------
 # 3. 지표 계산 함수
@@ -470,68 +480,4 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         else:
             status_text.success(f"✨ {len(res)}개 종목 발견 완료!")
             df_r = pd.DataFrame(res).sort_values('등락률', ascending=False).reset_index(drop=True)
-            st.session_state['scan_result'] = df_r
-
-    except Exception as e:
-        status_text.error(f"오류 발생: {e}")
-
-# ---------------------------------------------------------
-# 결과 표시 (리스트 상단, 차트 하단, 스크롤 이동 버튼)
-# ---------------------------------------------------------
-if 'scan_result' in st.session_state:
-    df_r = st.session_state['scan_result']
-    
-    # [1] 스크롤 이동을 위한 앵커 포인트 (ID 생성)
-    st.markdown('<div id="main_list"></div>', unsafe_allow_html=True)
-
-    # [2] 종목 리스트 표시
-    st.markdown("### 📋 검색된 종목 리스트")
-    st.info("👇 리스트에서 종목을 클릭하면 **아래에** 차트가 나타납니다.")
-
-    event = st.dataframe(
-        df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
-        use_container_width=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        hide_index=True,
-        height=300
-    )
-
-    # [3] 선택된 경우 차트 그리기
-    if len(event.selection.rows) > 0:
-        selected_index = event.selection.rows[0]
-        selected_row = df_r.iloc[selected_index]
-        
-        st.markdown("---")
-        st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
-        c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
-        c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
-        c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
-        
-        with st.spinner("차트 로딩 중..."):
-            fig = draw_chart(
-                selected_row['코드'], 
-                selected_row['종목명'], 
-                selected_row['점수'], 
-                selected_row['목표가'], 
-                selected_row['손절선']
-            )
-            if fig:
-                st.pyplot(fig)
-                st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
-        
-        # [4] 리스트로 돌아가는 버튼 (스크롤 기능 포함)
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("⬆️ 종목 리스트로 이동", type="secondary", use_container_width=True):
-            # 자바스크립트를 이용해 id='main_list' 위치로 스크롤 이동
-            components.html(
-                """
-                <script>
-                    window.parent.document.getElementById('main_list').scrollIntoView({behavior: 'smooth'});
-                </script>
-                """,
-                height=0
-            )
+            
