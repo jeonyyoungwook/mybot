@@ -26,8 +26,14 @@ st.markdown("""
         html, body, [data-testid="stAppViewContainer"] {
             overscroll-behavior-y: none !important;
         }
+        /* 버튼 글씨 진하게 */
         .stButton button {
             font-weight: bold;
+        }
+        /* 라디오 버튼 간격 조정 */
+        div.row-widget.stRadio > div {
+            flex-direction: column;
+            align-items: flex-start;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -402,7 +408,9 @@ today_cnt, total_cnt = track_visitors()
 with st.sidebar:
     st.header("🔍 검색 설정")
     market_option = st.selectbox("시장 선택", ["KOSPI", "KOSDAQ", "KRX (전체)"])
-    strategy_option = st.selectbox("전략 선택", [
+    
+    # [수정] selectbox -> radio로 변경 (모든 옵션 펼쳐서 보이기)
+    strategy_option = st.radio("전략 선택", [
         "0: 🐣 단밤 돌파",
         "1: 💎 찐바닥 (최바닥주)",
         "2: 🚀 급등 후 눌림목 (추천)",
@@ -414,7 +422,7 @@ with st.sidebar:
         "8: 🛫 이륙 준비 (정배열 초입)",
         "9: 🌊 첫 턴 (손익비 필터)",
         "10: ☁️ 일목균형표 구름돌파"
-    ], index=0) # [수정됨] 기본값 0번으로 변경
+    ], index=0) # 기본값 0번
     
     st.markdown("---")
     min_price = st.number_input("최소 주가 (원)", value=1000, step=100)
