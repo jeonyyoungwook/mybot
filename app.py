@@ -17,7 +17,7 @@ import json
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", layout="wide")
 
-# [핵심 1] 화면 최상단 위치를 잡기 위한 앵커 (이곳으로 이동함)
+# [핵심 1] 화면 최상단 앵커
 st.markdown('<div id="top_anchor"></div>', unsafe_allow_html=True)
 
 # [핵심 2] 모바일 당겨서 새로고침 방지 (CSS)
@@ -26,7 +26,6 @@ st.markdown("""
         html, body, [data-testid="stAppViewContainer"] {
             overscroll-behavior-y: none !important;
         }
-        /* 맨 위로 가기 버튼 스타일 강조 */
         .stButton button {
             font-weight: bold;
         }
@@ -163,7 +162,7 @@ def get_trend_breakout(df):
     except: return None
 
 # ---------------------------------------------------------
-# 5. 분석 로직
+# 5. 분석 로직 (0번, 1번 포함 확인)
 # ---------------------------------------------------------
 def analyze_stock(row, strategy_mode):
     try:
