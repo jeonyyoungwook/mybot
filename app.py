@@ -12,14 +12,22 @@ import platform
 import json
 
 # ---------------------------------------------------------
+# 0. 세션 상태 초기화 (페이지 새로고침 방지용)
+# ---------------------------------------------------------
+if 'df_result' not in st.session_state:
+    st.session_state['df_result'] = None
+if 'page_index' not in st.session_state:
+    st.session_state['page_index'] = 0
+if 'scan_done' not in st.session_state:
+    st.session_state['scan_done'] = False
+
+# ---------------------------------------------------------
 # 1. 방문자 수 카운트 & 상태 표시 로직
 # ---------------------------------------------------------
 def track_visitors():
-    """방문자 수를 JSON 파일로 관리하여 카운팅"""
     filename = 'visitors.json'
     today_str = datetime.now().strftime('%Y-%m-%d')
     
-    # 파일이 없으면 생성
     if not os.path.exists(filename):
         data = {'total': 0, 'today': 0, 'last_date': today_str}
     else:
@@ -29,13 +37,10 @@ def track_visitors():
         except:
             data = {'total': 0, 'today': 0, 'last_date': today_str}
 
-    # 날짜가 바뀌었으면 Today 초기화
     if data['last_date'] != today_str:
         data['today'] = 0
         data['last_date'] = today_str
 
-    # 세션 상태를 확인하여 새로고침 시 무한 증가 방지 (선택 사항)
-    # 여기서는 단순하게 페이지 로드될 때마다 증가하도록 설정
     if 'visited' not in st.session_state:
         data['total'] += 1
         data['today'] += 1
@@ -54,7 +59,7 @@ st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", la
 def set_font_force():
     system_name = platform.system()
     f_path = ''
-    if system_name == 'Linux': # 스트림릿 클라우드/코랩 환경
+    if system_name == 'Linux':
         f_path = '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf'
         if not os.path.exists(f_path):
             f_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
@@ -76,19 +81,15 @@ def set_font_force():
 FONT_PROP = set_font_force()
 
 # ---------------------------------------------------------
-# 3. 지표 계산 함수 (완전한 버전)
+# 3. 지표 계산 함수
 # ---------------------------------------------------------
 def calculate_adx(df, n=14):
-    """ADX 지표 계산"""
     plus_dm = df['High'].diff()
     minus_dm = df['Low'].diff()
     plus_dm = np.where((plus_dm > minus_dm) & (plus_dm > 0), plus_dm, 0.0)
     minus_dm = np.where((minus_dm > plus_dm) & (minus_dm > 0), -minus_dm, 0.0)
     
-    tr1 = df['High'] - df['Low']
-    tr2 = abs(df['High'] - df['Close'].shift(1))
-    tr3 = abs(df['Low'] - df['Close'].shift(1))
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    tr = pd.concat([df['High'] - df['Low'], abs(df['High'] - df['Close'].shift(1)), abs(df['Low'] - df['Close'].shift(1))], axis=1).max(axis=1)
     
     atr = tr.ewm(alpha=1/n, adjust=False).mean()
     plus_di = 100 * (pd.Series(plus_dm, index=df.index).ewm(alpha=1/n, adjust=False).mean() / atr)
@@ -100,51 +101,40 @@ def calculate_adx(df, n=14):
     return adx
 
 def calculate_indicators(df):
-    """모든 보조지표 계산"""
     if len(df) < 120: return df
     
-    # 이동평균선
     df['MA5'] = df['Close'].rolling(window=5).mean()
     df['MA20'] = df['Close'].rolling(window=20).mean()
     df['MA60'] = df['Close'].rolling(window=60).mean()
-    df['MA88'] = df['Close'].rolling(window=88).mean()   # 6번 전략용
-    df['MA112'] = df['Close'].rolling(window=112).mean() # 8번 전략용
+    df['MA88'] = df['Close'].rolling(window=88).mean()
+    df['MA112'] = df['Close'].rolling(window=112).mean()
     df['MA120'] = df['Close'].rolling(window=120).mean()
     df['MA224'] = df['Close'].rolling(window=224).mean()
     
-    # 특수 지표
     df['Blue_Line'] = df['Low'].rolling(window=60).min()
-    
     h12 = df['High'].shift(1).rolling(12).max()
     l12 = df['Low'].shift(1).rolling(12).min()
     df['Black_Line'] = (h12 + l12) / 2
-    
     h20 = df['High'].shift(1).rolling(20).max()
     l20 = df['Low'].shift(1).rolling(20).min()
     df['Gray_Line'] = l20 + (h20 - l20) * 0.618
     
-    # 일목균형표
     high9 = df['High'].rolling(window=9).max()
     low9 = df['Low'].rolling(window=9).min()
     tenkan = (high9 + low9) / 2
-    
     high26 = df['High'].rolling(window=26).max()
     low26 = df['Low'].rolling(window=26).min()
     kijun = (high26 + low26) / 2
-    
     df['Span1'] = ((tenkan + kijun) / 2).shift(26)
     high52 = df['High'].rolling(window=52).max()
     low52 = df['Low'].rolling(window=52).min()
     df['Span2'] = ((high52 + low52) / 2).shift(26)
     
-    # 기타
     df['Amount'] = df['Close'] * df['Volume']
     df['ADX'] = calculate_adx(df)
-    
     return df
 
 def get_trend_breakout(df):
-    """5번 스나이퍼 전략용 추세선 계산"""
     try:
         if len(df) < 130: return None
         window = df.iloc[-180:-5].copy()
@@ -163,7 +153,7 @@ def get_trend_breakout(df):
     except: return None
 
 # ---------------------------------------------------------
-# 4. 분석 로직 (수정된 전략 포함)
+# 4. 분석 로직
 # ---------------------------------------------------------
 def analyze_stock(row, strategy_mode):
     try:
@@ -183,8 +173,22 @@ def analyze_stock(row, strategy_mode):
         score_str = ""; note_str = ""; trend_info = None
         rec_entry = 0; target_price = 0; stop_loss = 0
 
-        # [2] 🚀 눌림목
-        if strategy_mode == '2':
+        # 전략들 (0~10번)
+        if strategy_mode == '0':
+            t = df.iloc[-1]; y = df.iloc[-2]
+            if pd.isna(t['Black_Line']): return None
+            if (y['Close'] < y['Black_Line']) and (t['Close'] > t['Black_Line']):
+               score_str = "🐣단밤돌파"; rec_entry = int(curr); target_price = int(t['Gray_Line'])
+            else: return None
+        elif strategy_mode == '1':
+            t = df.iloc[-1]; blue = t['Blue_Line']
+            if pd.isna(blue) or blue == 0: return None
+            if (curr - blue) / blue * 100 > 7.0: return None
+            if t['Close'] <= t['Open']: return None
+            if pd.isna(t['MA5']) or t['Close'] < t['MA5']: return None
+            if t['Amount'] < 50000000: return None
+            score_str = "💎찐바닥(추세전환)"; rec_entry = int(curr); stop_loss = int(blue)
+        elif strategy_mode == '2':
             t = df.iloc[-1]
             ma20 = t['MA20']; ma60 = t['MA60']
             if pd.isna(ma20) or pd.isna(ma60): return None
@@ -196,8 +200,6 @@ def analyze_stock(row, strategy_mode):
             vol_ma20 = df['Volume'].iloc[-20:].mean()
             if df['Volume'].iloc[-1] > vol_ma20 * 2.0: return None 
             score_str = "🚀급등 후 눌림목"; rec_entry = int(curr); target_price = int(recent_high); stop_loss = int(ma60)
-
-        # [3] 🏆 바닥+돌파
         elif strategy_mode == '3':
             t = df.iloc[-1]; y = df.iloc[-2]; ma20 = t['MA20']; blue_line = t['Blue_Line']
             if pd.isna(ma20) or pd.isna(blue_line): return None
@@ -207,18 +209,6 @@ def analyze_stock(row, strategy_mode):
             if t['Volume'] < y['Volume'] * 1.5: return None
             if t['Amount'] < 100000000: return None
             score_str = "🏆바닥권 20일선 돌파"; rec_entry = int(curr); target_price = int(t['MA60']) if t['MA60'] > curr else int(curr * 1.15); stop_loss = int(ma20)
-
-        # [1] 💎 최바닥주
-        elif strategy_mode == '1':
-            t = df.iloc[-1]; blue = t['Blue_Line']
-            if pd.isna(blue) or blue == 0: return None
-            if (curr - blue) / blue * 100 > 7.0: return None
-            if t['Close'] <= t['Open']: return None
-            if pd.isna(t['MA5']) or t['Close'] < t['MA5']: return None
-            if t['Amount'] < 50000000: return None
-            score_str = "💎찐바닥(추세전환)"; rec_entry = int(curr); stop_loss = int(blue)
-
-        # [4] ⚡ 계단상승
         elif strategy_mode == '4':
             t = df.iloc[-1]
             if pd.isna(t['MA120']) or pd.isna(t['MA60']) or pd.isna(t['MA20']): return None
@@ -229,8 +219,68 @@ def analyze_stock(row, strategy_mode):
             if curr < t['MA60']: return None
             if curr > t['MA60'] * 1.25: return None
             score_str = "⚡정배열 계단상승"; rec_entry = int(curr); stop_loss = int(t['MA60'])
-
-        # [10] ☁️ 일목+거래량폭발
+        elif strategy_mode == '5':
+            trend_info = get_trend_breakout(df)
+            if not trend_info: return None
+            g = (curr - df['MA20'].iloc[-1]) / df['MA20'].iloc[-1] * 100
+            if g > 5 or g < -3: return None
+            score_str = "📐스나이퍼"; rec_entry = int(curr); target_price = int(curr * 1.10); stop_loss = int(df['MA20'].iloc[-1])
+        elif strategy_mode == '6':
+            found = False
+            if df['Amount'].iloc[-1] < 300000000: return None
+            for i in range(1, 6):
+                idx = -i
+                t = df.iloc[idx]
+                ma88 = t.get('MA88', 0)
+                if pd.isna(ma88) or ma88 == 0: continue
+                if not (t['MA20'] > t['MA60'] > ma88): continue
+                if not (t['Low'] <= ma88 * 1.03 and t['Close'] >= ma88): continue
+                if t['Close'] <= t['Open']: continue 
+                if t['ADX'] > 35: continue
+                score_str = f"🌸MA88 지지 ({df.index[idx].strftime('%m/%d')})"; 
+                rec_entry = int(t['Close']); target_price = int(curr * 1.15); 
+                stop_loss = int(t['Low']); found = True; break
+            if not found: return None
+        elif strategy_mode == '7':
+            t = df.iloc[-1]; y = df.iloc[-2]
+            if (t['Close'] - y['Close']) / y['Close'] * 100 < 5.0: return None
+            if t['Amount'] < 1000000000: return None
+            vol_ma20 = df['Volume'].iloc[-21:-1].mean()
+            if t['Volume'] < y['Volume'] * 2.0 and t['Volume'] < vol_ma20 * 2.0: return None
+            body = t['Close'] - t['Open']
+            upper_tail = t['High'] - t['Close']
+            if body <= 0: return None 
+            if upper_tail > body: return None 
+            if not pd.isna(t['MA20']) and t['Close'] < t['MA20']: return None
+            score_str = f"🔥급등포착(+{round((t['Close']-y['Close'])/y['Close']*100,1)}%)"; 
+            rec_entry = int(curr); target_price = int(curr * 1.10); stop_loss = int(t['Open'])
+        elif strategy_mode == '8':
+            t = df.iloc[-1]; ma112 = t['MA112']; black = t['Black_Line']
+            if pd.isna(ma112) or pd.isna(black): return None
+            if curr < ma112: return None
+            if (curr - ma112) / ma112 * 100 > 5.0: return None
+            if curr < black: return None
+            if t['MA20'] < t['MA60']: return None
+            if t['Amount'] < 500000000: return None
+            score_str = "🛫이륙준비 (112선 지지)"; rec_entry = int(curr); 
+            target_price = int(t['MA224'] if not pd.isna(t['MA224']) else curr*1.15); 
+            stop_loss = int(ma112 * 0.98)
+        elif strategy_mode == '9':
+            t = df.iloc[-1]; y = df.iloc[-2]; y2 = df.iloc[-3]
+            blue = t['Blue_Line']
+            if min(t['Low'], y['Low'], y2['Low']) > blue * 1.015: return None
+            if t['Close'] <= t['Open']: return None
+            if y['Close'] > y['MA5']: return None
+            if t['Close'] <= t['MA5']: return None
+            if t['Close'] > t['MA60'] * 1.05: return None
+            resistances = [t['MA20'], t['MA60'], t['MA120'], t['MA112'], t['MA224']]
+            valid_resistances = [r for r in resistances if not pd.isna(r) and r > curr]
+            if len(valid_resistances) > 0:
+                nearest_wall = min(valid_resistances); profit_room = (nearest_wall - curr) / curr * 100
+                if profit_room < 3.0: return None
+                target_price = int(nearest_wall); note_str = f"기대수익: {profit_room:.1f}%"
+            else: target_price = int(curr * 1.15); note_str = "상방열림"
+            score_str = f"🌊확실한 턴 ({note_str})"; rec_entry = int(curr); stop_loss = int(t['Open'])
         elif strategy_mode == '10':
             t = df.iloc[-1]; y = df.iloc[-2]
             if pd.isna(t['Span1']) or pd.isna(t['Span2']): return None
@@ -249,88 +299,6 @@ def analyze_stock(row, strategy_mode):
             recent_high_60 = df['High'].iloc[-60:-1].max()
             if t['Close'] < recent_high_60: return None
             score_str = f"☁️구름돌파 ({int(t['Volume']/y['Volume']*100)}%)"; rec_entry = int(curr); target_price = int(curr * 1.15); stop_loss = int(min(t['MA60'], t['Span1']))
-
-        # [8] 🛫 이륙 준비 (필터 대폭 강화됨)
-        elif strategy_mode == '8':
-            t = df.iloc[-1]; ma112 = t['MA112']; black = t['Black_Line']
-            if pd.isna(ma112) or pd.isna(black): return None
-            
-            # 1. 112일선 지지: 0~5% 이내
-            if curr < ma112: return None
-            if (curr - ma112) / ma112 * 100 > 5.0: return None
-
-            # 2. 중심선(Black) 위, 정배열(20>60)
-            if curr < black: return None
-            if t['MA20'] < t['MA60']: return None
-            
-            # 3. 거래대금 5억 이상
-            if t['Amount'] < 500000000: return None
-            
-            score_str = "🛫이륙준비 (112선 지지)"; rec_entry = int(curr); 
-            target_price = int(t['MA224'] if not pd.isna(t['MA224']) else curr*1.15); 
-            stop_loss = int(ma112 * 0.98)
-
-        # [7] 🔥 급등 단타 (강화됨)
-        elif strategy_mode == '7':
-            t = df.iloc[-1]; y = df.iloc[-2]
-            # 5% 이상 상승
-            if (t['Close'] - y['Close']) / y['Close'] * 100 < 5.0: return None
-            # 거래대금 10억 이상
-            if t['Amount'] < 1000000000: return None
-            # 거래량 폭발 조건
-            vol_ma20 = df['Volume'].iloc[-21:-1].mean()
-            if t['Volume'] < y['Volume'] * 2.0 and t['Volume'] < vol_ma20 * 2.0: return None
-            # 윗꼬리 체크
-            body = t['Close'] - t['Open']
-            upper_tail = t['High'] - t['Close']
-            if body <= 0: return None 
-            if upper_tail > body: return None 
-            
-            # 추세
-            if not pd.isna(t['MA20']) and t['Close'] < t['MA20']: return None
-            
-            score_str = f"🔥급등포착(+{round((t['Close']-y['Close'])/y['Close']*100,1)}%)"; 
-            rec_entry = int(curr); target_price = int(curr * 1.10); stop_loss = int(t['Open'])
-
-        # [6] 🌸 분홍화살표 (강화됨)
-        elif strategy_mode == '6':
-            found = False
-            # 거래대금 3억 이상
-            if df['Amount'].iloc[-1] < 300000000: return None
-            
-            for i in range(1, 6): # 최근 5일
-                idx = -i
-                t = df.iloc[idx]
-                ma88 = t.get('MA88', 0)
-                if pd.isna(ma88) or ma88 == 0: continue
-                # 정배열 20 > 60 > 88
-                if not (t['MA20'] > t['MA60'] > ma88): continue
-                # 저가가 88일선 터치/근접 후 양봉
-                if not (t['Low'] <= ma88 * 1.03 and t['Close'] >= ma88): continue
-                if t['Close'] <= t['Open']: continue # 양봉
-                if t['ADX'] > 35: continue # 과열 아님
-                
-                score_str = f"🌸MA88 지지 ({df.index[idx].strftime('%m/%d')})"; 
-                rec_entry = int(t['Close']); target_price = int(curr * 1.15); 
-                stop_loss = int(t['Low']); found = True; break
-            if not found: return None
-
-        # [5] 스나이퍼
-        elif strategy_mode == '5':
-            trend_info = get_trend_breakout(df)
-            if not trend_info: return None
-            g = (curr - df['MA20'].iloc[-1]) / df['MA20'].iloc[-1] * 100
-            if g > 5 or g < -3: return None
-            score_str = "📐스나이퍼"; rec_entry = int(curr); target_price = int(curr * 1.10); stop_loss = int(df['MA20'].iloc[-1])
-
-        # [0] 단밤
-        elif strategy_mode == '0':
-            t = df.iloc[-1]; y = df.iloc[-2]
-            if pd.isna(t['Black_Line']): return None
-            if (y['Close'] < y['Black_Line']) and (t['Close'] > t['Black_Line']):
-               score_str = "🐣단밤돌파"; rec_entry = int(curr); target_price = int(t['Gray_Line'])
-            else: return None
-
         else: return None
 
         if rec_entry == 0: rec_entry = int(curr)
@@ -349,37 +317,31 @@ def analyze_stock(row, strategy_mode):
         return None
 
 # ---------------------------------------------------------
-# 5. 차트 그리기 함수 (Streamlit용)
+# 5. 차트 그리기 함수
 # ---------------------------------------------------------
 def draw_chart(code, name, score_str):
-    """차트를 그려서 pyplot 객체를 반환하는 함수"""
     try:
         df = fdr.DataReader(code, (datetime.now()-timedelta(days=600)))
         df = calculate_indicators(df)
-        plot_df = df.iloc[-150:] # 최근 150일
+        plot_df = df.iloc[-150:] 
 
         fig, ax = plt.subplots(figsize=(10, 5))
 
-        # 전략별 차트 스타일
         if '구름' in score_str:
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] >= plot_df['Span2']), facecolor='#ffbfbf', alpha=0.3)
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] < plot_df['Span2']), facecolor='#aebbff', alpha=0.3)
             ax.plot(plot_df.index, plot_df['MA60'], color='orange', linewidth=2, label='60일선')
-        
         elif 'MA88' in score_str:
             ax.plot(plot_df.index, plot_df['MA20'], color='green', linewidth=1)
             ax.plot(plot_df.index, plot_df['MA88'], color='magenta', linewidth=2, label='88일선')
-        
-        elif '이륙' in score_str: # 8번
+        elif '이륙' in score_str:
             ax.plot(plot_df.index, plot_df['MA20'], color='green', linewidth=1)
             ax.plot(plot_df.index, plot_df['MA112'], color='purple', linewidth=2, linestyle='-.', label='112일선')
-            
-        else: # 기본 스타일
+        else:
             ax.fill_between(plot_df.index, plot_df['MA20'], plot_df['MA60'], where=(plot_df['MA20']>=plot_df['MA60']), facecolor='red', alpha=0.1)
             ax.fill_between(plot_df.index, plot_df['MA20'], plot_df['MA60'], where=(plot_df['MA20']<plot_df['MA60']), facecolor='blue', alpha=0.1)
             ax.plot(plot_df.index, plot_df['MA20'], color='black', linewidth=1)
 
-        # 캔들 차트
         for idx in plot_df.index:
             o, h, l, c = plot_df.loc[idx, ['Open', 'High', 'Low', 'Close']]
             color = 'red' if c >= o else 'blue'
@@ -395,28 +357,40 @@ def draw_chart(code, name, score_str):
         return None
 
 # ---------------------------------------------------------
-# 6. UI 메인 (Streamlit Layout)
+# 6. 페이지 변경 콜백 함수 (버튼 클릭시 호출)
+# ---------------------------------------------------------
+def next_page():
+    if st.session_state.df_result is not None:
+        if st.session_state.page_index < len(st.session_state.df_result) - 1:
+            st.session_state.page_index += 1
+
+def prev_page():
+    if st.session_state.page_index > 0:
+        st.session_state.page_index -= 1
+
+# ---------------------------------------------------------
+# 7. UI 메인 (Streamlit)
 # ---------------------------------------------------------
 
-# 방문자 카운트 업데이트
 today_cnt, total_cnt = track_visitors()
 
-# 사이드바 설정
 with st.sidebar:
     st.header("🔍 검색 설정")
     market_option = st.selectbox("시장 선택", ["KOSPI", "KOSDAQ", "KRX (전체)"])
+    
     strategy_option = st.selectbox("전략 선택", [
+        "0: 🐣 단밤 돌파",
+        "1: 💎 찐바닥 (최바닥주)",
         "2: 🚀 급등 후 눌림목 (추천)",
         "3: 🏆 바닥권 20일선 돌파",
+        "4: ⚡ 정배열 계단상승",
+        "5: 📐 스나이퍼 (추세돌파)",
+        "6: 🌸 MA88 지지 (분홍화살표)",
         "7: 🔥 급등 단타 (강력필터)",
         "8: 🛫 이륙 준비 (정배열 초입)",
-        "6: 🌸 MA88 지지 (분홍화살표)",
-        "4: ⚡ 정배열 계단상승",
-        "10: ☁️ 일목균형표 구름돌파",
-        "1: 💎 찐바닥 (최바닥주)",
-        "5: 📐 스나이퍼 (추세돌파)",
-        "0: 🐣 단밤 돌파"
-    ])
+        "9: 🌊 첫 턴 (손익비 필터)",
+        "10: ☁️ 일목균형표 구름돌파"
+    ], index=2) 
     
     st.markdown("---")
     min_price = st.number_input("최소 주가 (원)", value=1000, step=100)
@@ -425,7 +399,6 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 팁: '8번', '7번' 전략은 필터가 강화되어 종목이 적게 나올 수 있습니다.")
 
-# 메인 화면 상단 (접속자 & 상태 표시)
 col1, col2, col3 = st.columns([2, 1, 1])
 with col1:
     st.title("💎 전설의 매매 (App Ver)")
@@ -449,9 +422,9 @@ with col3:
 
 st.markdown("---")
 
-# 검색 실행 버튼
+# 검색 실행 버튼 (데이터 로딩만 수행)
 if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
-    mode = strategy_option.split(":")[0] # 번호만 추출
+    mode = strategy_option.split(":")[0] 
     market_code = "KOSPI" if market_option == "KOSPI" else "KOSDAQ" if market_option == "KOSDAQ" else "KRX"
     
     status_text = st.empty()
@@ -461,10 +434,8 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
     
     try:
         df_krx = fdr.StockListing(market_code)
-        # 스팩, 리츠 등 제외
         df_krx = df_krx[~df_krx['Name'].str.contains('스팩|ETF|ETN|리츠|우B|우C|홀딩스', regex=True)]
         
-        # 숫자형 변환
         for c in ['Close', 'Amount', 'ChagesRatio']: 
             df_krx[c] = pd.to_numeric(df_krx[c], errors='coerce')
             
@@ -476,15 +447,13 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         res = []
         completed = 0
         
-        # 병렬 처리
-        with ThreadPoolExecutor(max_workers=10) as exe:
+        # max_workers=15
+        with ThreadPoolExecutor(max_workers=15) as exe:
             fut = [exe.submit(analyze_stock, row, mode) for _, row in target.iterrows()]
             for f in as_completed(fut):
                 completed += 1
                 if r := f.result():
                     res.append(r)
-                
-                # 진행률 업데이트 (너무 자주는 부하 걸리므로 1% 단위)
                 if completed % (total_items // 100 + 1) == 0:
                     progress_bar.progress(completed / total_items)
 
@@ -492,41 +461,81 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         
         if not res:
             status_text.error(f"❌ 조건에 맞는 종목이 없습니다. ({mode}번 전략)")
+            st.session_state['scan_done'] = False
+            st.session_state['df_result'] = None
         else:
             status_text.success(f"✨ {len(res)}개 종목 발견 완료!")
-            
-            # 결과 DataFrame 생성
             df_r = pd.DataFrame(res).sort_values('등락률', ascending=False).reset_index(drop=True)
             
-            # 탭 구분
-            tab1, tab2 = st.tabs(["📋 리스트 보기", "📈 차트 보기"])
+            # 세션에 결과 저장
+            st.session_state['df_result'] = df_r
+            st.session_state['page_index'] = 0
+            st.session_state['scan_done'] = True
             
-            with tab1:
-                st.dataframe(
-                    df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
-                    use_container_width=True
-                )
-                
-            with tab2:
-                # 차트 그리기 (상위 20개만 로딩 속도를 위해 제한, 필요시 제거 가능)
-                st.info("차트는 로딩 속도를 위해 상위 20개까지만 표시됩니다.")
-                for i, row in df_r.head(20).iterrows():
-                    with st.expander(f"{i+1}. {row['종목명']} ({row['등락률']}%) - {row['점수']}"):
-                        col_info, col_chart = st.columns([1, 3])
-                        
-                        with col_info:
-                            st.markdown(f"**💰 현재가:** {int(row['현재가']):,}원")
-                            st.markdown(f"**📢 진입가:** {int(row['추천진입가']):,}원")
-                            st.markdown(f"**🎯 목표가:** <span style='color:red'>{int(row['목표가']):,}원</span>", unsafe_allow_html=True)
-                            st.markdown(f"**🛡️ 손절가:** <span style='color:blue'>{int(row['손절선']):,}원</span>", unsafe_allow_html=True)
-                            st.markdown(f"[네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={row['코드']})")
-                        
-                        with col_chart:
-                            fig = draw_chart(row['코드'], row['종목명'], row['점수'])
-                            if fig:
-                                st.pyplot(fig)
-                            else:
-                                st.error("차트를 불러올 수 없습니다.")
-
     except Exception as e:
         status_text.error(f"오류 발생: {e}")
+        st.session_state['scan_done'] = False
+
+# ---------------------------------------------------------
+# 8. 결과 화면 표시 (스캔 완료 상태일 때만)
+# ---------------------------------------------------------
+if st.session_state['scan_done'] and st.session_state['df_result'] is not None:
+    df_result = st.session_state['df_result']
+    
+    tab1, tab2 = st.tabs(["📋 리스트 보기", "📈 차트 보기 (페이지 이동)"])
+    
+    # 탭 1: 전체 리스트
+    with tab1:
+        st.dataframe(
+            df_result[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
+            use_container_width=True
+        )
+        
+    # 탭 2: 차트 뷰어 (페이지네이션)
+    with tab2:
+        idx = st.session_state['page_index']
+        total = len(df_result)
+        
+        # 현재 페이지의 종목 정보 가져오기
+        row = df_result.iloc[idx]
+        
+        st.markdown(f"### {idx + 1} / {total} - {row['종목명']} ({row['코드']})")
+        
+        # 정보 & 차트 분할
+        c_info, c_chart = st.columns([1, 3])
+        
+        with c_info:
+            st.info(f"**유형:** {row['점수']}")
+            st.markdown(f"**💰 현재가:** {int(row['현재가']):,}원")
+            st.markdown(f"**📈 등락률:** {row['등락률']}%")
+            st.markdown("---")
+            st.markdown(f"**📢 진입가:** {int(row['추천진입가']):,}원")
+            st.markdown(f"**🎯 목표가:** <span style='color:red'>{int(row['목표가']):,}원</span>", unsafe_allow_html=True)
+            st.markdown(f"**🛡️ 손절가:** <span style='color:blue'>{int(row['손절선']):,}원</span>", unsafe_allow_html=True)
+            st.markdown("---")
+            st.link_button("네이버 증권 상세", f"https://finance.naver.com/item/main.naver?code={row['코드']}")
+
+        with c_chart:
+            fig = draw_chart(row['코드'], row['종목명'], row['점수'])
+            if fig:
+                st.pyplot(fig)
+            else:
+                st.error("차트 로딩 실패")
+        
+        # 페이지네이션 버튼
+        col_prev, col_page, col_next = st.columns([1, 2, 1])
+        
+        with col_prev:
+            st.button("◀ 이전 종목", 
+                      on_click=prev_page, 
+                      disabled=(idx == 0),
+                      use_container_width=True)
+        
+        with col_page:
+            st.markdown(f"<div style='text-align: center; padding-top: 10px;'><b>{idx + 1} / {total}</b></div>", unsafe_allow_html=True)
+            
+        with col_next:
+            st.button("다음 종목 ▶", 
+                      on_click=next_page, 
+                      disabled=(idx == total - 1),
+                      use_container_width=True)
