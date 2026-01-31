@@ -13,11 +13,14 @@ import platform
 import json
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 및 모바일 새로고침(리셋) 방지
+# 1. 페이지 설정 및 모바일 최적화
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", layout="wide")
 
-# [핵심] 모바일에서 화면을 당겨서 새로고침(Pull-to-Refresh) 되는 것을 막는 CSS
+# [핵심 1] 화면 최상단 위치를 잡기 위한 앵커 (보이지 않음)
+st.markdown('<div id="top_anchor"></div>', unsafe_allow_html=True)
+
+# [핵심 2] 모바일 당겨서 새로고침 방지 (CSS)
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"] {
@@ -156,7 +159,7 @@ def get_trend_breakout(df):
     except: return None
 
 # ---------------------------------------------------------
-# 5. 분석 로직 (들여쓰기 주의)
+# 5. 분석 로직
 # ---------------------------------------------------------
 def analyze_stock(row, strategy_mode):
     try:
@@ -340,18 +343,21 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
 
         fig, ax = plt.subplots(figsize=(12, 6)) 
 
+        # 1. 캔들 그리기
         for idx in plot_df.index:
             o, h, l, c = plot_df.loc[idx, ['Open', 'High', 'Low', 'Close']]
             color = 'red' if c >= o else 'blue'
             ax.vlines(idx, l, h, color=color, linewidth=1)
             ax.bar(idx, height=c-o, bottom=o, width=0.6, color=color)
 
+        # 2. 이동평균선
         if 'MA112' in plot_df.columns:
             ax.plot(plot_df.index, plot_df['MA112'], color='#800080', linewidth=2, linestyle='--', label='112일선')
         
         if 'MA224' in plot_df.columns:
             ax.plot(plot_df.index, plot_df['MA224'], color='#555555', linewidth=3, label='224일선')
 
+        # 3. 목표가/손절선 (선 + 텍스트)
         ax.axhline(y=target_price, color='red', linestyle=':', linewidth=2)
         ax.axhline(y=stop_loss, color='blue', linestyle=':', linewidth=2)
 
@@ -363,6 +369,7 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
         ax.text(start_date, stop_loss, f' 손절선 {int(stop_loss):,} ', 
                 color='blue', fontsize=11, fontweight='bold', ha='left', va='top', fontproperties=FONT_PROP)
 
+        # 4. 전략별 추가 지표
         if '구름' in score_str:
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] >= plot_df['Span2']), facecolor='#ffbfbf', alpha=0.3)
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] < plot_df['Span2']), facecolor='#aebbff', alpha=0.3)
@@ -484,7 +491,7 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         status_text.error(f"오류 발생: {e}")
 
 # ---------------------------------------------------------
-# 8. 결과 표시 및 차트 (스크롤 제어)
+# 8. 결과 표시 및 스크롤 버튼
 # ---------------------------------------------------------
 if 'scan_result' in st.session_state:
     df_r = st.session_state['scan_result']
@@ -542,3 +549,15 @@ if 'scan_result' in st.session_state:
                 """,
                 height=0
             )
+
+# [5] 맨 위로 이동 (화면 최상단)
+st.markdown("<hr>", unsafe_allow_html=True)
+if st.button("🔝 화면 맨 위로 이동", use_container_width=True):
+    components.html(
+        """
+        <script>
+            window.parent.document.getElementById('top_anchor').scrollIntoView({behavior: 'smooth'});
+        </script>
+        """,
+        height=0
+    )
