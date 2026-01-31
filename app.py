@@ -13,11 +13,11 @@ import platform
 import json
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 및 모바일 최적화
+# 1. 페이지 설정 & 모바일 최적화
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 검색기", page_icon="💎", layout="wide")
 
-# [핵심 1] 화면 최상단 위치를 잡기 위한 앵커 (보이지 않음)
+# [핵심 1] 화면 최상단 위치를 잡기 위한 앵커 (이곳으로 이동함)
 st.markdown('<div id="top_anchor"></div>', unsafe_allow_html=True)
 
 # [핵심 2] 모바일 당겨서 새로고침 방지 (CSS)
@@ -25,6 +25,10 @@ st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"] {
             overscroll-behavior-y: none !important;
+        }
+        /* 맨 위로 가기 버튼 스타일 강조 */
+        .stButton button {
+            font-weight: bold;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -491,7 +495,7 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         status_text.error(f"오류 발생: {e}")
 
 # ---------------------------------------------------------
-# 8. 결과 표시 및 스크롤 버튼
+# 8. 결과 표시 및 차트, 이동 버튼
 # ---------------------------------------------------------
 if 'scan_result' in st.session_state:
     df_r = st.session_state['scan_result']
@@ -550,14 +554,14 @@ if 'scan_result' in st.session_state:
                 height=0
             )
 
-# [5] 맨 위로 이동 (화면 최상단)
-st.markdown("<hr>", unsafe_allow_html=True)
-if st.button("🔝 화면 맨 위로 이동", use_container_width=True):
-    components.html(
-        """
-        <script>
-            window.parent.document.getElementById('top_anchor').scrollIntoView({behavior: 'smooth'});
-        </script>
-        """,
-        height=0
-    )
+    # [5] 맨 위로 이동 (앱 최상단)
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+    if st.button("🔝 맨 위로 이동 (검색 설정)", type="primary", use_container_width=True):
+        components.html(
+            """
+            <script>
+                window.parent.document.getElementById('top_anchor').scrollIntoView({behavior: 'smooth'});
+            </script>
+            """,
+            height=0
+        )
