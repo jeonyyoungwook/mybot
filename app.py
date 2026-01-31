@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components # 스크롤 제어를 위해 추가
 import pandas as pd
 import numpy as np
 import FinanceDataReader as fdr
@@ -475,17 +476,17 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         status_text.error(f"오류 발생: {e}")
 
 # ---------------------------------------------------------
-# 결과 표시 (차트 상단, 리스트 하단 구조)
+# 결과 표시 (리스트 상단, 차트 하단, 스크롤 이동 버튼)
 # ---------------------------------------------------------
 if 'scan_result' in st.session_state:
     df_r = st.session_state['scan_result']
     
-    # 1. 차트가 들어갈 자리(상단)를 미리 확보 (Container)
-    chart_container = st.container()
+    # [1] 스크롤 이동을 위한 앵커 포인트 (ID 생성)
+    st.markdown('<div id="main_list"></div>', unsafe_allow_html=True)
 
-    # 2. 종목 리스트 표시 (하단)
+    # [2] 종목 리스트 표시
     st.markdown("### 📋 검색된 종목 리스트")
-    st.info("👇 리스트에서 종목을 클릭하면 **바로 위 상단**에 차트가 나타납니다.")
+    st.info("👇 리스트에서 종목을 클릭하면 **아래에** 차트가 나타납니다.")
 
     event = st.dataframe(
         df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
@@ -493,33 +494,44 @@ if 'scan_result' in st.session_state:
         on_select="rerun",
         selection_mode="single-row",
         hide_index=True,
-        height=400 # 모바일에서 너무 길지 않게 고정
+        height=300
     )
 
-    # 3. 선택 이벤트 발생 시 -> 상단 Container에 차트 그리기
+    # [3] 선택된 경우 차트 그리기
     if len(event.selection.rows) > 0:
         selected_index = event.selection.rows[0]
         selected_row = df_r.iloc[selected_index]
         
-        with chart_container:
-            st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
-            
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
-            c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
-            c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
-            c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
-            
-            with st.spinner("차트 로딩 중..."):
-                fig = draw_chart(
-                    selected_row['코드'], 
-                    selected_row['종목명'], 
-                    selected_row['점수'], 
-                    selected_row['목표가'], 
-                    selected_row['손절선']
-                )
-                if fig:
-                    st.pyplot(fig)
-                    st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
-            
-            st.markdown("---") # 차트와 리스트 사이 구분선
+        st.markdown("---")
+        st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
+        c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
+        c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
+        c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
+        
+        with st.spinner("차트 로딩 중..."):
+            fig = draw_chart(
+                selected_row['코드'], 
+                selected_row['종목명'], 
+                selected_row['점수'], 
+                selected_row['목표가'], 
+                selected_row['손절선']
+            )
+            if fig:
+                st.pyplot(fig)
+                st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
+        
+        # [4] 리스트로 돌아가는 버튼 (스크롤 기능 포함)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("⬆️ 종목 리스트로 이동", type="secondary", use_container_width=True):
+            # 자바스크립트를 이용해 id='main_list' 위치로 스크롤 이동
+            components.html(
+                """
+                <script>
+                    window.parent.document.getElementById('main_list').scrollIntoView({behavior: 'smooth'});
+                </script>
+                """,
+                height=0
+            )
