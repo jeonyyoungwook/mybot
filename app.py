@@ -318,7 +318,7 @@ def analyze_stock(row, strategy_mode):
         return None
 
 # ---------------------------------------------------------
-# 5. 차트 그리기 함수 (수정됨: 텍스트 추가)
+# 5. 차트 그리기 함수 (수정됨: 텍스트 왼쪽으로 이동)
 # ---------------------------------------------------------
 def draw_chart(code, name, score_str, target_price, stop_loss):
     try:
@@ -347,16 +347,16 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
         ax.axhline(y=target_price, color='red', linestyle=':', linewidth=2)
         ax.axhline(y=stop_loss, color='blue', linestyle=':', linewidth=2)
 
-        # 텍스트 그리기 (가장 오른쪽 날짜 기준)
-        last_date = plot_df.index[-1]
+        # 텍스트 그리기 (가장 왼쪽 날짜 기준)
+        start_date = plot_df.index[0] # 시작 날짜 (왼쪽)
         
-        # 목표가 텍스트 (빨간색, 오른쪽 정렬, 선 바로 위)
-        ax.text(last_date, target_price, f' 목표가 {int(target_price):,} ', 
-                color='red', fontsize=11, fontweight='bold', ha='right', va='bottom', fontproperties=FONT_PROP)
+        # 목표가 텍스트 (빨간색, 왼쪽 정렬, 선 바로 위)
+        ax.text(start_date, target_price, f' 목표가 {int(target_price):,} ', 
+                color='red', fontsize=11, fontweight='bold', ha='left', va='bottom', fontproperties=FONT_PROP)
         
-        # 손절선 텍스트 (파란색, 오른쪽 정렬, 선 바로 아래)
-        ax.text(last_date, stop_loss, f' 손절선 {int(stop_loss):,} ', 
-                color='blue', fontsize=11, fontweight='bold', ha='right', va='top', fontproperties=FONT_PROP)
+        # 손절선 텍스트 (파란색, 왼쪽 정렬, 선 바로 아래)
+        ax.text(start_date, stop_loss, f' 손절선 {int(stop_loss):,} ', 
+                color='blue', fontsize=11, fontweight='bold', ha='left', va='top', fontproperties=FONT_PROP)
 
         # 4. 전략별 추가 지표
         if '구름' in score_str:
