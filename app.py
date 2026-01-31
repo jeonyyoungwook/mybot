@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 import os
 import platform
 import json
-import math
 
 # ---------------------------------------------------------
 # 1. 방문자 수 카운트 & 상태 표시 로직
@@ -165,7 +164,6 @@ def analyze_stock(row, strategy_mode):
         score_str = ""; note_str = ""; trend_info = None
         rec_entry = 0; target_price = 0; stop_loss = 0
 
-        # 전략 로직은 그대로 유지 (길어서 생략된 부분 없이 모두 포함)
         # [0] 🐣 단밤 돌파
         if strategy_mode == '0':
             t = df.iloc[-1]; y = df.iloc[-2]
@@ -320,7 +318,7 @@ def analyze_stock(row, strategy_mode):
         return None
 
 # ---------------------------------------------------------
-# 5. 차트 그리기 함수
+# 5. 차트 그리기 함수 (수정됨: 텍스트 추가)
 # ---------------------------------------------------------
 def draw_chart(code, name, score_str, target_price, stop_loss):
     try:
@@ -330,21 +328,37 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
 
         fig, ax = plt.subplots(figsize=(12, 6)) 
 
+        # 1. 캔들 그리기
         for idx in plot_df.index:
             o, h, l, c = plot_df.loc[idx, ['Open', 'High', 'Low', 'Close']]
             color = 'red' if c >= o else 'blue'
             ax.vlines(idx, l, h, color=color, linewidth=1)
             ax.bar(idx, height=c-o, bottom=o, width=0.6, color=color)
 
+        # 2. 이동평균선
         if 'MA112' in plot_df.columns:
             ax.plot(plot_df.index, plot_df['MA112'], color='#800080', linewidth=2, linestyle='--', label='112일선')
         
         if 'MA224' in plot_df.columns:
             ax.plot(plot_df.index, plot_df['MA224'], color='#555555', linewidth=3, label='224일선')
 
-        ax.axhline(y=target_price, color='red', linestyle=':', linewidth=2, label=f'목표가 {int(target_price):,}')
-        ax.axhline(y=stop_loss, color='blue', linestyle=':', linewidth=2, label=f'손절선 {int(stop_loss):,}')
+        # 3. 목표가/손절선 (선 + 텍스트)
+        # 선 그리기
+        ax.axhline(y=target_price, color='red', linestyle=':', linewidth=2)
+        ax.axhline(y=stop_loss, color='blue', linestyle=':', linewidth=2)
 
+        # 텍스트 그리기 (가장 오른쪽 날짜 기준)
+        last_date = plot_df.index[-1]
+        
+        # 목표가 텍스트 (빨간색, 오른쪽 정렬, 선 바로 위)
+        ax.text(last_date, target_price, f' 목표가 {int(target_price):,} ', 
+                color='red', fontsize=11, fontweight='bold', ha='right', va='bottom', fontproperties=FONT_PROP)
+        
+        # 손절선 텍스트 (파란색, 오른쪽 정렬, 선 바로 아래)
+        ax.text(last_date, stop_loss, f' 손절선 {int(stop_loss):,} ', 
+                color='blue', fontsize=11, fontweight='bold', ha='right', va='top', fontproperties=FONT_PROP)
+
+        # 4. 전략별 추가 지표
         if '구름' in score_str:
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] >= plot_df['Span2']), facecolor='#ffbfbf', alpha=0.3)
             ax.fill_between(plot_df.index, plot_df['Span1'], plot_df['Span2'], where=(plot_df['Span1'] < plot_df['Span2']), facecolor='#aebbff', alpha=0.3)
@@ -368,10 +382,6 @@ def draw_chart(code, name, score_str, target_price, stop_loss):
 # ---------------------------------------------------------
 # 6. UI 메인 (Streamlit)
 # ---------------------------------------------------------
-
-# 페이지 상태 초기화 (처음 로드 시)
-if 'page_index' not in st.session_state:
-    st.session_state['page_index'] = 0
 
 today_cnt, total_cnt = track_visitors()
 
@@ -422,13 +432,6 @@ with col3:
 
 st.markdown("---")
 
-# 버튼 콜백 함수 (페이지 이동용)
-def next_page():
-    st.session_state['page_index'] += 1
-
-def prev_page():
-    st.session_state['page_index'] -= 1
-
 # 종목 스캔 버튼 로직
 if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
     mode = strategy_option.split(":")[0] 
@@ -468,85 +471,71 @@ if st.button("🔍 종목 스캔 시작 (Start)", type="primary"):
         if not res:
             status_text.error(f"❌ 조건에 맞는 종목이 없습니다. ({mode}번 전략)")
             if 'scan_result' in st.session_state:
-                del st.session_state['scan_result'] # 결과 없음 -> 기존 결과 삭제
+                del st.session_state['scan_result'] 
         else:
             status_text.success(f"✨ {len(res)}개 종목 발견 완료!")
             df_r = pd.DataFrame(res).sort_values('등락률', ascending=False).reset_index(drop=True)
             
-            # 결과를 세션 스테이트에 저장 (리렌더링 되어도 유지되도록)
             st.session_state['scan_result'] = df_r
-            st.session_state['page_index'] = 0 # 새 검색 시 페이지 0으로 초기화
 
     except Exception as e:
         status_text.error(f"오류 발생: {e}")
 
 # ---------------------------------------------------------
-# 결과 표시 (세션 스테이트에 결과가 있을 때만 실행)
+# 결과 표시 및 차트 인터랙션
 # ---------------------------------------------------------
 if 'scan_result' in st.session_state:
     df_r = st.session_state['scan_result']
     
-    tab1, tab2 = st.tabs(["📋 리스트 보기", "📈 차트 보기"])
-    
-    with tab1:
-        st.dataframe(
-            df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
-            use_container_width=True
-        )
-        
-    with tab2:
-        # 페이지네이션 설정
-        items_per_page = 5
-        total_items = len(df_r)
-        total_pages = math.ceil(total_items / items_per_page)
-        
-        current_page = st.session_state['page_index']
-        start_idx = current_page * items_per_page
-        end_idx = start_idx + items_per_page
-        
-        # 현재 페이지 데이터 슬라이싱
-        page_df = df_r.iloc[start_idx:end_idx]
-        
-        if len(page_df) == 0:
-            st.info("표시할 데이터가 없습니다.")
-        else:
-            for i, row in page_df.iterrows():
-                # 인덱스가 전체 기준이 되도록 i+1 표시
-                with st.expander(f"{i+1}. {row['종목명']} ({row['등락률']}%) - {row['점수']}", expanded=True):
-                    col_info, col_chart = st.columns([1, 3])
-                    
-                    with col_info:
-                        st.markdown(f"**💰 현재가:** {int(row['현재가']):,}원")
-                        st.markdown(f"**📢 진입가:** {int(row['추천진입가']):,}원")
-                        st.markdown(f"**🎯 목표가:** <span style='color:red'>{int(row['목표가']):,}원</span>", unsafe_allow_html=True)
-                        st.markdown(f"**🛡️ 손절가:** <span style='color:blue'>{int(row['손절선']):,}원</span>", unsafe_allow_html=True)
-                        st.markdown(f"[네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={row['코드']})")
-                    
-                    with col_chart:
-                        fig = draw_chart(row['코드'], row['종목명'], row['점수'], row['목표가'], row['손절선'])
-                        if fig:
-                            st.pyplot(fig)
-                        else:
-                            st.error("차트를 불러올 수 없습니다.")
+    st.markdown("### 📋 검색된 종목 리스트")
+    st.info("👇 리스트에서 종목을 클릭하면 아래에 상세 차트가 나타납니다.")
 
-        st.markdown("---")
+    # 1. 데이터프레임 표시 (on_select 활성화)
+    event = st.dataframe(
+        df_r[['시장', '종목명', '코드', '현재가', '등락률', '점수', '추천진입가', '목표가', '손절선']],
+        use_container_width=True,
+        on_select="rerun",           # 선택 시 리런
+        selection_mode="single-row", # 한 번에 한 줄만 선택
+        hide_index=True              # 인덱스 숨김 (깔끔하게)
+    )
+
+    st.markdown("---")
+
+    # 2. 선택된 행이 있는지 확인 후 차트 그리기
+    if len(event.selection.rows) > 0:
+        selected_index = event.selection.rows[0]
+        selected_row = df_r.iloc[selected_index]
         
-        # 페이지네이션 버튼 (이전 / 페이지 정보 / 다음)
-        col_prev, col_page, col_next = st.columns([1, 2, 1])
+        st.markdown(f"### 📈 {selected_row['종목명']} ({selected_row['코드']}) 상세 분석")
         
-        with col_prev:
-            # 첫 페이지면 '이전' 버튼 비활성화
-            if current_page > 0:
-                st.button("⬅️ 이전 5개", on_click=prev_page)
+        # 정보 표시
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("현재가", f"{int(selected_row['현재가']):,}원", f"{selected_row['등락률']}%")
+        c2.metric("추천 진입가", f"{int(selected_row['추천진입가']):,}원")
+        c3.metric("목표가", f"{int(selected_row['목표가']):,}원")
+        c4.metric("손절가", f"{int(selected_row['손절선']):,}원")
+        
+        # 차트 로딩 및 표시
+        with st.spinner(f"{selected_row['종목명']} 차트 불러오는 중..."):
+            fig = draw_chart(
+                selected_row['코드'], 
+                selected_row['종목명'], 
+                selected_row['점수'], 
+                selected_row['목표가'], 
+                selected_row['손절선']
+            )
+            
+            if fig:
+                st.pyplot(fig)
+                st.markdown(f"[🔗 네이버 증권 바로가기](https://finance.naver.com/item/main.naver?code={selected_row['코드']})")
             else:
-                st.button("⬅️ 이전 5개", disabled=True)
-        
-        with col_page:
-            st.markdown(f"<div style='text-align:center; line-height:35px;'><b>{current_page + 1}</b> / {total_pages} 페이지</div>", unsafe_allow_html=True)
-        
-        with col_next:
-            # 마지막 페이지면 '다음' 버튼 비활성화
-            if end_idx < total_items:
-                st.button("다음 5개 ➡️", on_click=next_page)
-            else:
-                st.button("다음 5개 ➡️", disabled=True)
+                st.error("차트 데이터를 불러오는데 실패했습니다.")
+    
+    else:
+        st.markdown(
+            """
+            <div style="text-align:center; padding: 50px; color:gray; background-color:#f9f9f9; border-radius:10px;">
+                👆 위 목록에서 차트를 보고 싶은 종목을 클릭하세요.
+            </div>
+            """, unsafe_allow_html=True
+        )
