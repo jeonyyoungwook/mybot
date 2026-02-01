@@ -378,10 +378,9 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
 # 5. 메인 UI
 # ---------------------------------------------------------
 def main():
-    # 상단 제목
-    st.title("💎 전설의 매매 검색기 Ver 42.9")
+    st.title("💎 전설의 매매 검색기 Ver 42.10")
     
-    # [방문자 & 상태] 메인 화면 상단으로 이동
+    # 상태 표시
     today_visitor_count = get_today_visitors()
     col_status, col_visit = st.columns([1, 1])
     with col_status:
@@ -391,10 +390,9 @@ def main():
     
     st.markdown("---")
 
-    # 사이드바 (검색 설정만 남김)
+    # 사이드바
     with st.sidebar:
         st.header("🔍 검색 설정")
-        
         market_option = st.selectbox("시장 선택", ["코스피", "코스닥", "전체"])
         market_code = 'KOSPI' if market_option == '코스피' else 'KOSDAQ' if market_option == '코스닥' else 'KRX'
 
@@ -418,11 +416,7 @@ def main():
             '11': '11. ✨ 15분봉 피보나치 0.236'
         }
         
-        selected_strat_text = st.radio(
-            "원하는 전략을 선택하세요:", 
-            options=list(strategies.values()), 
-            index=2
-        )
+        selected_strat_text = st.radio("원하는 전략을 선택하세요:", options=list(strategies.values()), index=2)
         mode = [k for k, v in strategies.items() if v == selected_strat_text][0]
         st.markdown("---")
         search_btn = st.button("🚀 종목 검색 시작", type="primary", use_container_width=True)
@@ -433,7 +427,7 @@ def main():
         st.session_state.search_results = None
         st.session_state.selected_stock = None 
         
-        st.info(f"📡 {market_option} 시장에서 [{strategies[mode]}] 전략으로 스캔 중입니다... (거래대금/RSI 필터 적용)")
+        st.info(f"📡 {market_option} 시장에서 [{strategies[mode]}] 전략으로 스캔 중입니다...")
         
         try:
             with st.spinner("종목 리스트 불러오는 중..."):
@@ -475,27 +469,9 @@ def main():
             st.error(f"오류가 발생했습니다: {e}")
 
     # ---------------------------------------------------------
-    # 결과 화면 (차트 뷰어 + 리스트)
+    # 결과 화면
     # ---------------------------------------------------------
     if st.session_state.search_results is not None:
-        
-        # [1] 단일 차트 뷰어 영역
-        if st.session_state.selected_stock is not None:
-            sel = st.session_state.selected_stock
-            st.markdown("---")
-            st.subheader(f"📈 {sel['종목명']} 상세 차트")
-            
-            if st.button("❌ 차트 닫기"):
-                st.session_state.selected_stock = None
-                st.rerun()
-            
-            with st.spinner("차트 생성 중..."):
-                fig = plot_chart(sel['코드'], sel['종목명'], sel['점수'], sel['목표가'], sel['손절선'])
-                if fig:
-                    st.pyplot(fig)
-                    plt.close(fig)
-
-        # [2] 리스트 출력
         df_res = st.session_state.search_results
         items_per_page = 5
         total_items = len(df_res)
@@ -508,42 +484,71 @@ def main():
         st.markdown("---")
         st.subheader(f"📄 검색 결과 (페이지 {st.session_state.current_page + 1} / {total_pages})")
 
+        # 1. 깔끔한 리스트 출력 (컬럼형 테이블 스타일)
         for i, row in current_page_data.iterrows():
-            with st.container(border=True):
-                col1, col2 = st.columns([4, 1])
+            with st.container():
+                c1, c2, c3, c4 = st.columns([2.5, 2, 2.5, 1])
                 
-                with col1:
-                    st.markdown(f"### [{row['시장']}] {row['종목명']} ({row['코드']})")
-                    st.markdown(f"**유형:** {row['점수']}")
-                    
-                    # [에러 수정 부분] f-string 안전하게 변경
-                    st.markdown(f"💰 현재가: **{int(row['현재가']):,}원** ({row['등락률']}%) | 💸 대금: **{int(row['거래대금']/100000000)}억** | 📉 RSI: {row['RSI']}")
-                    st.markdown(f":green[📢 진입: {int(row['추천진입가']):,}원] | :red[🎯 목표: {int(row['목표가']):,}원] | :blue[🛡️ 손절: {int(row['손절선']):,}원]")
+                with c1:
+                    st.markdown(f"**[{row['시장']}] {row['종목명']}**")
+                    st.caption(f"{row['코드']}")
                 
-                with col2:
-                    st.markdown("<br>", unsafe_allow_html=True) 
-                    if st.button("📊 차트 보기", key=f"btn_{row['코드']}", use_container_width=True):
+                with c2:
+                    color = "red" if row['등락률'] > 0 else "blue"
+                    st.markdown(f"**{int(row['현재가']):,}원**")
+                    st.markdown(f":{color}[{row['등락률']}%]")
+
+                with c3:
+                    st.markdown(f"<span style='font-size:14px'>🎯 목표: {int(row['목표가']):,}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='font-size:14px; color:blue'>🛡️ 손절: {int(row['손절선']):,}</span>", unsafe_allow_html=True)
+                
+                with c4:
+                    if st.button("📉 차트", key=f"btn_{row['코드']}", use_container_width=True):
                         st.session_state.selected_stock = row
                         st.rerun()
-                    
-                    st.link_button("네이버 증권", f"https://finance.naver.com/item/main.naver?code={row['코드']}", use_container_width=True)
 
-        # 페이지네이션
-        st.markdown("<br>", unsafe_allow_html=True)
-        col_prev, col_page, col_next = st.columns([1, 2, 1])
-        
-        with col_prev:
-            if st.button("◀ 이전 페이지", disabled=(st.session_state.current_page == 0), use_container_width=True):
+                st.divider() # 구분선
+
+        # 2. 페이지네이션 버튼 (리스트 아래)
+        col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+        with col_p1:
+            if st.button("◀ 이전", key="prev_top", disabled=(st.session_state.current_page == 0), use_container_width=True):
                 st.session_state.current_page -= 1
+                st.session_state.selected_stock = None # 페이지 이동시 차트 닫기
                 st.rerun()
-        
-        with col_page:
-            st.markdown(f"<div style='text-align: center; font-weight: bold; padding-top: 10px;'>{st.session_state.current_page + 1} / {total_pages}</div>", unsafe_allow_html=True)
-
-        with col_next:
-            if st.button("다음 페이지 ▶", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
+        with col_p2:
+            st.markdown(f"<div style='text-align:center; padding-top:5px'><b>{st.session_state.current_page + 1} / {total_pages}</b></div>", unsafe_allow_html=True)
+        with col_p3:
+            if st.button("다음 ▶", key="next_top", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
                 st.session_state.current_page += 1
+                st.session_state.selected_stock = None
                 st.rerun()
+
+        # 3. 차트 뷰어 (선택된 경우 리스트 맨 아래에 표시)
+        if st.session_state.selected_stock is not None:
+            sel = st.session_state.selected_stock
+            st.markdown("---")
+            st.info(f"📈 **{sel['종목명']}** 상세 차트")
+            
+            with st.spinner("차트 생성 중..."):
+                fig = plot_chart(sel['코드'], sel['종목명'], sel['점수'], sel['목표가'], sel['손절선'])
+                if fig:
+                    st.pyplot(fig)
+                    plt.close(fig)
+
+            # 4. 차트 아래 페이지네이션 버튼 (편의성)
+            st.markdown("#### 페이지 이동")
+            c_b1, c_b2, c_b3 = st.columns([1, 2, 1])
+            with c_b1:
+                if st.button("◀ 이전 페이지", key="prev_bot", disabled=(st.session_state.current_page == 0), use_container_width=True):
+                    st.session_state.current_page -= 1
+                    st.session_state.selected_stock = None
+                    st.rerun()
+            with c_b3:
+                if st.button("다음 페이지 ▶", key="next_bot", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
+                    st.session_state.current_page += 1
+                    st.session_state.selected_stock = None
+                    st.rerun()
 
 if __name__ == "__main__":
     main()
