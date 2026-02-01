@@ -19,6 +19,9 @@ if 'search_results' not in st.session_state:
     st.session_state.search_results = None
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 0
+# [중요] 현재 열려있는 차트의 종목 코드를 저장 (하나만 열기 위해)
+if 'opened_chart_code' not in st.session_state:
+    st.session_state.opened_chart_code = None 
 
 # [오늘 방문자 카운터 함수]
 def get_today_visitors():
@@ -361,7 +364,7 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
             ax1.axhline(stop_loss, color='blue', linestyle='-.', linewidth=1.5)
             ax1.text(plot_df.index[-1], stop_loss, f' 🛑 {stop_loss:,}', color='blue', va='top', fontweight='bold')
 
-        ax1.set_title(f"{name} ({code}) - {score_str}", fontsize=15, fontweight='bold')
+        ax1.set_title(f"{name} ({code}) - {score_str}", fontsize=14, fontweight='bold')
         ax1.legend(loc='upper left')
         ax1.grid(True, alpha=0.2, linestyle='--')
         ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
@@ -376,7 +379,7 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
 # 5. 메인 UI
 # ---------------------------------------------------------
 def main():
-    st.title("💎 전설의 매매 검색기 Ver 42.12")
+    st.title("💎 전설의 매매 검색기 Ver 42.13")
     
     # 상태 표시
     today_visitor_count = get_today_visitors()
@@ -423,6 +426,7 @@ def main():
     if search_btn:
         st.session_state.current_page = 0
         st.session_state.search_results = None
+        st.session_state.opened_chart_code = None # 검색 시 초기화
         
         st.info(f"📡 {market_option} 시장에서 [{strategies[mode]}] 전략으로 스캔 중입니다...")
         
@@ -466,11 +470,11 @@ def main():
             st.error(f"오류가 발생했습니다: {e}")
 
     # ---------------------------------------------------------
-    # 결과 화면 (깔끔한 접이식 리스트)
+    # 결과 화면 (리스트 + 토글 차트)
     # ---------------------------------------------------------
     if st.session_state.search_results is not None:
         
-        # 1. 앵커 태그 (위로 가기 목표 지점)
+        # 앵커 태그 (위로 가기 목표 지점)
         st.markdown('<div id="result_list_top"></div>', unsafe_allow_html=True)
 
         df_res = st.session_state.search_results
@@ -484,57 +488,66 @@ def main():
 
         st.markdown(f"### 📄 검색 결과 (페이지 {st.session_state.current_page + 1} / {total_pages})")
 
-        # 2. 접이식 리스트 (Expander)
+        # [핵심] 리스트 반복문
         for i, row in current_page_data.iterrows():
-            # 요약 정보 (접혀있을 때 보이는 부분)
-            summary = f"[{row['시장']}] {row['종목명']} ({row['코드']}) | {int(row['현재가']):,}원 | {row['등락률']}%"
-            
-            with st.expander(summary):
-                # 펼쳤을 때 내용
-                c1, c2 = st.columns([1, 2])
+            with st.container(border=True): # 깔끔한 박스 디자인
+                # 1. 정보 표시 줄
+                c1, c2, c3, c4 = st.columns([2.5, 2, 2.5, 1])
+                
                 with c1:
-                    st.markdown(f"#### {row['종목명']}")
-                    st.markdown(f"**유형:** {row['점수']}")
-                    st.markdown(f"💰 대금: **{int(row['거래대금']/100000000)}억**")
-                    st.markdown(f"📉 RSI: **{row['RSI']}**")
-                    st.markdown(f"🟢 진입: **{int(row['추천진입가']):,}**")
-                    st.markdown(f"🔴 목표: **{int(row['목표가']):,}**")
-                    st.markdown(f"🔵 손절: **{int(row['손절선']):,}**")
-                    st.link_button("네이버 증권", f"https://finance.naver.com/item/main.naver?code={row['코드']}")
+                    st.markdown(f"**[{row['시장']}] {row['종목명']}**")
+                    st.caption(f"{row['코드']}")
                 
                 with c2:
-                    # 차트 그리기
+                    color = "red" if row['등락률'] > 0 else "blue"
+                    st.markdown(f"**{int(row['현재가']):,}원**")
+                    st.markdown(f":{color}[{row['등락률']}%]")
+
+                with c3:
+                    st.markdown(f"<span style='font-size:13px'>🎯 {int(row['목표가']):,}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='font-size:13px; color:blue'>🛡️ {int(row['손절선']):,}</span>", unsafe_allow_html=True)
+                
+                with c4:
+                    # 차트 토글 버튼
+                    btn_label = "📉 차트"
+                    if st.session_state.opened_chart_code == row['Code']:
+                        btn_label = "❌ 닫기" # 이미 열려있으면 닫기 버튼으로 표시
+                    
+                    if st.button(btn_label, key=f"btn_{row['코드']}", use_container_width=True):
+                        # 버튼 로직: 이미 열려있으면 닫고, 아니면 연다 (다른건 자동 닫힘)
+                        if st.session_state.opened_chart_code == row['Code']:
+                            st.session_state.opened_chart_code = None # 닫기
+                        else:
+                            st.session_state.opened_chart_code = row['Code'] # 열기
+                        st.rerun()
+
+                # 2. 차트 영역 (조건부 렌더링 - 클릭된 것만 보임)
+                if st.session_state.opened_chart_code == row['Code']:
+                    st.markdown("---")
+                    st.info(f"📈 **{row['종목명']}** 상세 분석")
+                    
                     with st.spinner("차트 생성 중..."):
                         fig = plot_chart(row['코드'], row['종목명'], row['점수'], row['목표가'], row['손절선'])
                         if fig:
                             st.pyplot(fig)
                             plt.close(fig)
-                            
-                    # [위로 가기 버튼] 차트 바로 밑에 위치
-                    st.markdown("""
-                        <a href="#result_list_top" target="_self" style="text-decoration:none;">
-                            <div style="
-                                background-color: #f0f2f6;
-                                padding: 10px;
-                                border-radius: 5px;
-                                text-align: center;
-                                color: black;
-                                font-weight: bold;
-                                cursor: pointer;
-                                margin-top: 10px;
-                            ">
-                                ⬆️ 리스트 맨 위로 이동
-                            </div>
-                        </a>
-                    """, unsafe_allow_html=True)
+                    
+                    # [닫기 및 위로 가기 버튼]
+                    if st.button("⬆️ 닫기 & 리스트 위로", key=f"close_{row['코드']}", use_container_width=True):
+                        st.session_state.opened_chart_code = None
+                        st.rerun()
+                    
+                    # 앵커로 이동하는 HTML 스크립트 (버튼 클릭시 작동하도록)
+                    st.markdown('<script>window.location.href = "#result_list_top";</script>', unsafe_allow_html=True)
 
-        # 3. 페이지네이션 버튼
+        # 3. 페이지네이션
         st.markdown("<br>", unsafe_allow_html=True)
         col_prev, col_page, col_next = st.columns([1, 2, 1])
         
         with col_prev:
             if st.button("◀ 이전 페이지", disabled=(st.session_state.current_page == 0), use_container_width=True):
                 st.session_state.current_page -= 1
+                st.session_state.opened_chart_code = None # 페이지 이동시 차트 닫기
                 st.rerun()
         
         with col_page:
@@ -543,6 +556,7 @@ def main():
         with col_next:
             if st.button("다음 페이지 ▶", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
                 st.session_state.current_page += 1
+                st.session_state.opened_chart_code = None
                 st.rerun()
 
 if __name__ == "__main__":
