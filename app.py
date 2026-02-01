@@ -19,7 +19,6 @@ if 'search_results' not in st.session_state:
     st.session_state.search_results = None
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 0
-# [중요] 현재 열려있는 차트의 종목 코드를 저장 (하나만 열기 위해)
 if 'opened_chart_code' not in st.session_state:
     st.session_state.opened_chart_code = None 
 
@@ -379,7 +378,7 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
 # 5. 메인 UI
 # ---------------------------------------------------------
 def main():
-    st.title("💎 전설의 매매 검색기 Ver 42.13")
+    st.title("💎 전설의 매매 검색기 Ver 42.14")
     
     # 상태 표시
     today_visitor_count = get_today_visitors()
@@ -426,7 +425,7 @@ def main():
     if search_btn:
         st.session_state.current_page = 0
         st.session_state.search_results = None
-        st.session_state.opened_chart_code = None # 검색 시 초기화
+        st.session_state.opened_chart_code = None 
         
         st.info(f"📡 {market_option} 시장에서 [{strategies[mode]}] 전략으로 스캔 중입니다...")
         
@@ -474,7 +473,7 @@ def main():
     # ---------------------------------------------------------
     if st.session_state.search_results is not None:
         
-        # 앵커 태그 (위로 가기 목표 지점)
+        # 앵커 태그 (위로 가기 목표)
         st.markdown('<div id="result_list_top"></div>', unsafe_allow_html=True)
 
         df_res = st.session_state.search_results
@@ -488,9 +487,10 @@ def main():
 
         st.markdown(f"### 📄 검색 결과 (페이지 {st.session_state.current_page + 1} / {total_pages})")
 
-        # [핵심] 리스트 반복문
+        # 리스트 반복
         for i, row in current_page_data.iterrows():
-            with st.container(border=True): # 깔끔한 박스 디자인
+            # [수정] row['Code'] -> row['코드'] 등 한글 키 사용
+            with st.container(border=True):
                 # 1. 정보 표시 줄
                 c1, c2, c3, c4 = st.columns([2.5, 2, 2.5, 1])
                 
@@ -510,19 +510,18 @@ def main():
                 with c4:
                     # 차트 토글 버튼
                     btn_label = "📉 차트"
-                    if st.session_state.opened_chart_code == row['Code']:
-                        btn_label = "❌ 닫기" # 이미 열려있으면 닫기 버튼으로 표시
+                    if st.session_state.opened_chart_code == row['코드']:
+                        btn_label = "❌ 닫기"
                     
                     if st.button(btn_label, key=f"btn_{row['코드']}", use_container_width=True):
-                        # 버튼 로직: 이미 열려있으면 닫고, 아니면 연다 (다른건 자동 닫힘)
-                        if st.session_state.opened_chart_code == row['Code']:
-                            st.session_state.opened_chart_code = None # 닫기
+                        if st.session_state.opened_chart_code == row['코드']:
+                            st.session_state.opened_chart_code = None
                         else:
-                            st.session_state.opened_chart_code = row['Code'] # 열기
+                            st.session_state.opened_chart_code = row['코드']
                         st.rerun()
 
-                # 2. 차트 영역 (조건부 렌더링 - 클릭된 것만 보임)
-                if st.session_state.opened_chart_code == row['Code']:
+                # 2. 차트 영역 (선택된 종목만 열림)
+                if st.session_state.opened_chart_code == row['코드']:
                     st.markdown("---")
                     st.info(f"📈 **{row['종목명']}** 상세 분석")
                     
@@ -532,12 +531,11 @@ def main():
                             st.pyplot(fig)
                             plt.close(fig)
                     
-                    # [닫기 및 위로 가기 버튼]
+                    # 닫기 및 위로 가기 버튼
                     if st.button("⬆️ 닫기 & 리스트 위로", key=f"close_{row['코드']}", use_container_width=True):
                         st.session_state.opened_chart_code = None
                         st.rerun()
                     
-                    # 앵커로 이동하는 HTML 스크립트 (버튼 클릭시 작동하도록)
                     st.markdown('<script>window.location.href = "#result_list_top";</script>', unsafe_allow_html=True)
 
         # 3. 페이지네이션
@@ -547,7 +545,7 @@ def main():
         with col_prev:
             if st.button("◀ 이전 페이지", disabled=(st.session_state.current_page == 0), use_container_width=True):
                 st.session_state.current_page -= 1
-                st.session_state.opened_chart_code = None # 페이지 이동시 차트 닫기
+                st.session_state.opened_chart_code = None
                 st.rerun()
         
         with col_page:
