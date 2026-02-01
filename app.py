@@ -20,7 +20,7 @@ if 'search_results' not in st.session_state:
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 0
 if 'selected_stock' not in st.session_state:
-    st.session_state.selected_stock = None # 현재 선택된(차트 볼) 종목
+    st.session_state.selected_stock = None 
 
 # [오늘 방문자 카운터 함수]
 def get_today_visitors():
@@ -178,7 +178,7 @@ def analyze_stock(row, strategy_mode):
             t = df.iloc[-1]
             black = t['Black_Line']
             if pd.isna(black): return None
-            if t['Low'] < black: return None # 1원이라도 침범 시 탈락
+            if t['Low'] < black: return None
             if (t['Close'] - black) / black * 100 > 5.0: return None
             day_range = (t['High'] - t['Low']) / t['Open'] * 100
             if day_range > 15.0: return None 
@@ -337,7 +337,6 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
         if len(df) > 150: plot_df = df.iloc[-150:]
         else: plot_df = df
         
-        # 렉 방지를 위해 차트 그릴때만 피규어 생성 및 닫기
         fig, ax1 = plt.subplots(figsize=(12, 6))
 
         if '단밤' in score_str:
@@ -379,16 +378,21 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
 # 5. 메인 UI
 # ---------------------------------------------------------
 def main():
-    st.title("💎 전설의 매매 검색기 Ver 42.8")
+    # 상단 제목
+    st.title("💎 전설의 매매 검색기 Ver 42.9")
+    
+    # [방문자 & 상태] 메인 화면 상단으로 이동
+    today_visitor_count = get_today_visitors()
+    col_status, col_visit = st.columns([1, 1])
+    with col_status:
+        st.success("🟢 **현재 접속중: ON**")
+    with col_visit:
+        st.info(f"📅 **오늘 방문자: {today_visitor_count}명**")
+    
     st.markdown("---")
 
-    today_visitor_count = get_today_visitors()
-
+    # 사이드바 (검색 설정만 남김)
     with st.sidebar:
-        st.success("🟢 **현재 접속중: ON**")
-        st.info(f"📅 **오늘 방문자: {today_visitor_count}명**")
-        
-        st.markdown("---")
         st.header("🔍 검색 설정")
         
         market_option = st.selectbox("시장 선택", ["코스피", "코스닥", "전체"])
@@ -427,7 +431,7 @@ def main():
     if search_btn:
         st.session_state.current_page = 0
         st.session_state.search_results = None
-        st.session_state.selected_stock = None # 새 검색시 차트 초기화
+        st.session_state.selected_stock = None 
         
         st.info(f"📡 {market_option} 시장에서 [{strategies[mode]}] 전략으로 스캔 중입니다... (거래대금/RSI 필터 적용)")
         
@@ -475,23 +479,21 @@ def main():
     # ---------------------------------------------------------
     if st.session_state.search_results is not None:
         
-        # [1] 단일 차트 뷰어 영역 (선택된 종목이 있을 때만 표시)
+        # [1] 단일 차트 뷰어 영역
         if st.session_state.selected_stock is not None:
             sel = st.session_state.selected_stock
             st.markdown("---")
             st.subheader(f"📈 {sel['종목명']} 상세 차트")
             
-            # 닫기 버튼
             if st.button("❌ 차트 닫기"):
                 st.session_state.selected_stock = None
                 st.rerun()
             
-            # 차트 그리기 (이때만 그려지므로 렉 없음)
             with st.spinner("차트 생성 중..."):
                 fig = plot_chart(sel['코드'], sel['종목명'], sel['점수'], sel['목표가'], sel['손절선'])
                 if fig:
                     st.pyplot(fig)
-                    plt.close(fig) # 메모리 해제
+                    plt.close(fig)
 
         # [2] 리스트 출력
         df_res = st.session_state.search_results
@@ -507,13 +509,41 @@ def main():
         st.subheader(f"📄 검색 결과 (페이지 {st.session_state.current_page + 1} / {total_pages})")
 
         for i, row in current_page_data.iterrows():
-            # 깔끔한 박스 형태 디자인
             with st.container(border=True):
                 col1, col2 = st.columns([4, 1])
                 
                 with col1:
                     st.markdown(f"### [{row['시장']}] {row['종목명']} ({row['코드']})")
                     st.markdown(f"**유형:** {row['점수']}")
-                    info_html = f"""
-                    <div style='display: flex; gap: 15px; font-size: 14px;'>
-                        <span>💰 현재가: 
+                    
+                    # [에러 수정 부분] f-string 안전하게 변경
+                    st.markdown(f"💰 현재가: **{int(row['현재가']):,}원** ({row['등락률']}%) | 💸 대금: **{int(row['거래대금']/100000000)}억** | 📉 RSI: {row['RSI']}")
+                    st.markdown(f":green[📢 진입: {int(row['추천진입가']):,}원] | :red[🎯 목표: {int(row['목표가']):,}원] | :blue[🛡️ 손절: {int(row['손절선']):,}원]")
+                
+                with col2:
+                    st.markdown("<br>", unsafe_allow_html=True) 
+                    if st.button("📊 차트 보기", key=f"btn_{row['코드']}", use_container_width=True):
+                        st.session_state.selected_stock = row
+                        st.rerun()
+                    
+                    st.link_button("네이버 증권", f"https://finance.naver.com/item/main.naver?code={row['코드']}", use_container_width=True)
+
+        # 페이지네이션
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_prev, col_page, col_next = st.columns([1, 2, 1])
+        
+        with col_prev:
+            if st.button("◀ 이전 페이지", disabled=(st.session_state.current_page == 0), use_container_width=True):
+                st.session_state.current_page -= 1
+                st.rerun()
+        
+        with col_page:
+            st.markdown(f"<div style='text-align: center; font-weight: bold; padding-top: 10px;'>{st.session_state.current_page + 1} / {total_pages}</div>", unsafe_allow_html=True)
+
+        with col_next:
+            if st.button("다음 페이지 ▶", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
+                st.session_state.current_page += 1
+                st.rerun()
+
+if __name__ == "__main__":
+    main()
