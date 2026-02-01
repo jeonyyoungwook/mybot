@@ -10,19 +10,42 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 
 # ---------------------------------------------------------
-# 1. 기본 설정 및 폰트
+# 1. 기본 설정 및 방문자 로직
 # ---------------------------------------------------------
 st.set_page_config(page_title="전설의 매매 검색기", layout="wide")
 
-# 폰트 설정 (GitHub 리포지토리에 NanumGothic.ttf가 있다고 가정)
+# [오늘 방문자 카운터 함수]
+def get_today_visitors():
+    file_path = "visitor_log.txt"
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    count = 0
+    
+    # 파일 읽기
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read().strip().split(",")
+            # 날짜가 같으면 카운트 로드, 다르면(새로운 날) 0
+            if len(content) == 2 and content[0] == today_str:
+                count = int(content[1])
+    
+    # 세션 상태 확인 (새로고침 시 중복 카운트 방지)
+    if 'has_visited' not in st.session_state:
+        count += 1
+        st.session_state['has_visited'] = True
+        # 파일 업데이트
+        with open(file_path, "w") as f:
+            f.write(f"{today_str},{count}")
+            
+    return count
+
+# 폰트 설정
 @st.cache_resource
 def set_korean_font():
-    font_path = "NanumGothic.ttf"  # 같은 폴더에 폰트 파일이 있어야 함
+    font_path = "NanumGothic.ttf"
     if os.path.exists(font_path):
         fm.fontManager.addfont(font_path)
         plt.rc('font', family='NanumGothic')
     else:
-        # 폰트 파일이 없으면 시스템 폰트 시도 (리눅스/Streamlit Cloud 용)
         plt.rc('font', family='sans-serif') 
         plt.rcParams['axes.unicode_minus'] = False
 
@@ -156,13 +179,13 @@ def analyze_stock(row, strategy_mode):
         score_str = ""; note_str = ""; trend_info = None
         rec_entry = 0; target_price = 0; stop_loss = 0
 
-        # [0] 🐣 단밤 지지 (무관용 원칙 적용)
+        # [0] 🐣 단밤 지지 (무관용 원칙 - 침범 시 탈락)
         if strategy_mode == '0':
             t = df.iloc[-1]
             black = t['Black_Line']
             if pd.isna(black): return None
             
-            # 🔥 핵심수정: 저가(Low)가 검은선보다 1원이라도 낮으면 탈락 (침범 불가)
+            # 🔥 핵심: 저가(Low)가 1원이라도 검은선보다 낮으면 즉시 탈락
             if t['Low'] < black: return None 
             
             # 종가가 검은선에서 5% 이상 뜨면 안됨
@@ -382,11 +405,19 @@ def plot_chart(code, name, score_str, target_price, stop_loss):
 # 5. 메인 UI (Streamlit)
 # ---------------------------------------------------------
 def main():
-    st.title("💎 전설의 매매 검색기 Ver 42.4")
+    st.title("💎 전설의 매매 검색기 Ver 42.5")
     st.markdown("---")
+
+    # 오늘 방문자 계산
+    today_visitor_count = get_today_visitors()
 
     # 사이드바 입력
     with st.sidebar:
+        # [요청사항 반영] 상태 표시 및 오늘 방문자
+        st.success("🟢 **현재 접속중: ON**")
+        st.info(f"📅 **오늘 방문자: {today_visitor_count}명**")
+        
+        st.markdown("---")
         st.header("🔍 검색 설정")
         
         market_option = st.selectbox("시장 선택", ["코스피", "코스닥", "전체"])
@@ -397,6 +428,7 @@ def main():
         if max_price == 0: max_price = 9999999999
 
         st.markdown("### 📈 전략 선택")
+        # [요청사항 반영] 전체 텍스트가 잘 보이도록 selectbox 활용
         strategies = {
             '0': '0. 🐣 단밤 지지 (무관용 원칙)',
             '1': '1. 💎 최바닥주 (찐바닥)',
@@ -411,10 +443,19 @@ def main():
             '10': '10. ☁️ 일목+대량거래',
             '11': '11. ✨ 15분봉 피보나치 0.236'
         }
-        selected_strat = st.selectbox("전략을 선택하세요", list(strategies.values()), index=2) # 기본 2번
-        mode = selected_strat.split('.')[0] # 번호 추출
+        
+        # 딕셔너리의 값(Value)만 리스트로 만들어 보여줌
+        selected_strat_text = st.selectbox(
+            "전략을 선택하세요 (아래 목록 클릭)", 
+            options=list(strategies.values()), 
+            index=2
+        )
+        
+        # 선택된 텍스트에서 키(Key)인 '0', '1' 등 숫자 추출
+        mode = [k for k, v in strategies.items() if v == selected_strat_text][0]
 
-        search_btn = st.button("🚀 종목 검색 시작", type="primary")
+        st.markdown("---")
+        search_btn = st.button("🚀 종목 검색 시작", type="primary", use_container_width=True)
 
     # 메인 검색 로직
     if search_btn:
@@ -437,6 +478,7 @@ def main():
             
             results = []
             progress_bar = st.progress(0)
+            status_text = st.empty()
             
             # 멀티스레딩 분석
             with ThreadPoolExecutor(max_workers=10) as exe:
@@ -453,8 +495,10 @@ def main():
                     completed_count += 1
                     if completed_count % 10 == 0:
                         progress_bar.progress(completed_count / total_count)
+                        status_text.text(f"분석 진행률: {int(completed_count/total_count*100)}%")
             
             progress_bar.progress(1.0) # 완료
+            status_text.empty()
             
             if not results:
                 st.warning("❌ 조건에 맞는 종목을 찾지 못했습니다.")
