@@ -9,18 +9,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import os
 import urllib.request
+import math
 
 # ---------------------------------------------------------
 # 1. 페이지 설정 (와이드 모드)
 # ---------------------------------------------------------
 st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wide")
 
-# CSS로 상단 여백 줄이고 스타일 다듬기
+# 스타일 설정: 상단 여백 줄이기 및 앵커 이동 부드럽게
 st.markdown("""
     <style>
         .block-container {padding-top: 2rem; padding-bottom: 5rem;}
         h1 {margin-bottom: 0px;}
-        div[data-testid="stColumn"] {vertical-align: bottom;}
+        html {scroll-behavior: smooth;}
+        .stButton button {width: 100%;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -188,6 +190,10 @@ def create_chart_figure(code, name, score_str, scenario_lines=None):
 # 5. 메인 앱 실행 (전체 화면 UI)
 # ---------------------------------------------------------
 def main():
+    # 1. 초기 세션 상태 설정
+    if 'results' not in st.session_state: st.session_state.results = None
+    if 'page' not in st.session_state: st.session_state.page = 1
+
     # 상단 타이틀 섹션
     col_t1, col_t2 = st.columns([0.7, 0.3])
     with col_t1:
@@ -199,32 +205,26 @@ def main():
     st.divider()
 
     # 상단 컨트롤 패널 (가로 배치)
-    # [전략선택] [시장선택] [최소주가] [최대주가] [검색버튼]
     c1, c2, c3, c4, c5 = st.columns([1.5, 1, 1, 1, 0.8])
     
-    with c1:
-        mode = st.selectbox("📋 전략 선택", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"])
-    with c2:
-        market_opt = st.selectbox("🏢 시장", ["전체", "KOSPI", "KOSDAQ"])
-    with c3:
-        min_price = st.number_input("📉 최소가", value=1000, step=100)
-    with c4:
-        max_price = st.number_input("📈 최대가", value=200000, step=1000)
+    with c1: mode = st.selectbox("📋 전략 선택", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"])
+    with c2: market_opt = st.selectbox("🏢 시장", ["전체", "KOSPI", "KOSDAQ"])
+    with c3: min_price = st.number_input("📉 최소가", value=1000, step=100)
+    with c4: max_price = st.number_input("📈 최대가", value=200000, step=1000)
     with c5:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # 버튼 줄맞춤용 공백
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) 
         run_btn = st.button("🚀 검색 시작", type="primary", use_container_width=True)
 
-    if 'results' not in st.session_state:
-        st.session_state.results = None
-
+    # -----------------------------------------------------------------------------
     # 검색 로직
+    # -----------------------------------------------------------------------------
     if run_btn:
+        st.session_state.page = 1 # 검색 시 페이지 1로 초기화
         st_mode = 'N1' if "농사 A" in mode else 'N2'
         mkt_code = 'KRX' if market_opt == '전체' else market_opt
         
         status_box = st.status("🔍 토양 분석 중...", expanded=True)
         status_box.write("데이터 수집 및 조건 스캔을 시작합니다.")
-        
         prog_bar = status_box.progress(0)
         
         try:
@@ -260,33 +260,71 @@ def main():
         except Exception as e:
             st.error(f"오류 발생: {e}")
 
-    # 결과 화면 (상단: 표 / 하단: 차트 & 컨트롤)
+    # -----------------------------------------------------------------------------
+    # 결과 화면 (페이징 적용)
+    # -----------------------------------------------------------------------------
     if st.session_state.results is not None and not st.session_state.results.empty:
-        df_display = st.session_state.results
+        df_full = st.session_state.results
         
-        # 1. 종목 리스트 (Expander로 접었다 폈다 가능하게 하여 공간 확보)
-        with st.expander("📋 포착 종목 전체 리스트 보기 (클릭)", expanded=True):
-            st.dataframe(
-                df_display[['Market', 'Name', 'Code', 'Close', 'Change', 'Note', 'Support']],
-                column_config={
-                    "Name": "종목명", "Code": "코드", "Close": "현재가", 
-                    "Change": "등락률(%)", "Note": "포착 내용", "Support": "기준선(맥점)"
-                },
-                hide_index=True,
-                use_container_width=True
-            )
+        # 페이징 계산
+        items_per_page = 5
+        total_items = len(df_full)
+        total_pages = math.ceil(total_items / items_per_page)
         
-        st.markdown("### 📊 정밀 차트 분석")
+        start_idx = (st.session_state.page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        df_page = df_full.iloc[start_idx:end_idx]
+
+        # 리스트 상단 앵커 (이동용)
+        st.markdown("<div id='list_top'></div>", unsafe_allow_html=True)
+        st.markdown(f"### 📋 검색 결과 (PAGE {st.session_state.page} / {total_pages})")
+
+        # 1. 종목 리스트 (5개씩)
+        st.dataframe(
+            df_page[['Market', 'Name', 'Code', 'Close', 'Change', 'Note', 'Support']],
+            column_config={
+                "Name": "종목명", "Code": "코드", "Close": "현재가", 
+                "Change": "등락률(%)", "Note": "포착 내용", "Support": "기준선(맥점)"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+        # 2. 페이지 네비게이션 버튼 (맨앞, 이전, 다음, 맨뒤)
+        col_n1, col_n2, col_n3, col_n4, col_n5 = st.columns([1, 1, 2, 1, 1])
         
-        # 종목 선택기 (메인 화면 중앙에 배치)
+        # 버튼 콜백 함수
+        def set_page(p): st.session_state.page = p
+
+        with col_n1:
+            if st.session_state.page > 1:
+                st.button("⏪ 맨앞", on_click=set_page, args=(1,), key='btn_first')
+        with col_n2:
+            if st.session_state.page > 1:
+                st.button("◀ 이전", on_click=set_page, args=(st.session_state.page - 1,), key='btn_prev')
+        with col_n3:
+            st.markdown(f"<div style='text-align:center; padding-top:10px; font-weight:bold;'>PAGE {st.session_state.page} / {total_pages}</div>", unsafe_allow_html=True)
+        with col_n4:
+            if st.session_state.page < total_pages:
+                st.button("다음 ▶", on_click=set_page, args=(st.session_state.page + 1,), key='btn_next')
+        with col_n5:
+            if st.session_state.page < total_pages:
+                st.button("맨뒤 ⏩", on_click=set_page, args=(total_pages,), key='btn_last')
+
+        st.markdown("---")
+
+        # 3. 상세 차트 분석 (현재 페이지에 있는 종목 중에서 선택)
+        st.markdown("### 📊 정밀 차트 분석 (현재 페이지 종목)")
+        
+        # 선택 박스에는 현재 페이지의 종목만 나오게 설정 (직관성 UP)
         selected_option = st.selectbox(
-            "분석할 종목을 선택해주세요:",
-            options=df_display['Code'].tolist(),
-            format_func=lambda x: f"{df_display[df_display['Code']==x]['Name'].values[0]} ({x}) - {df_display[df_display['Code']==x]['Note'].values[0]}"
+            "차트를 확인할 종목을 선택하세요:",
+            options=df_page['Code'].tolist(),
+            format_func=lambda x: f"{df_page[df_page['Code']==x]['Name'].values[0]} ({x}) - {df_page[df_page['Code']==x]['Note'].values[0]}"
         )
         
         if selected_option:
-            row = df_display[df_display['Code'] == selected_option].iloc[0]
+            row = df_full[df_full['Code'] == selected_option].iloc[0]
             
             # 좌측: 컨트롤 패널 / 우측: 대형 차트
             col_left, col_right = st.columns([1, 2.5])
@@ -294,7 +332,6 @@ def main():
             with col_left:
                 st.markdown(f"#### {row['Name']}")
                 st.markdown(f"<h2 style='color:#e74c3c;'>{row['Close']:,}원 <span style='font-size:16px;'>({row['Change']}%)</span></h2>", unsafe_allow_html=True)
-                
                 st.info(f"**기준선(맥점): {row['Support']:,}원**\n\n{row['Note']}")
                 
                 st.markdown("---")
@@ -315,6 +352,18 @@ def main():
                 st.markdown("---")
                 share_text = f"[🚜 농사매매]\n{row['Name']}({row['Code']})\n현재: {row['Close']:,}원\n타점: {row['Note']}\n기준: {row['Support']:,}원\n{share_plan if split_level > 1 else ''}"
                 st.text_area("공유 텍스트", share_text, height=120)
+
+                # 리스트로 돌아가는 버튼 (HTML 링크)
+                st.markdown(
+                    """
+                    <a href='#list_top' style='text-decoration:none;'>
+                        <div style='background-color:#f0f2f6; color:#31333F; padding:10px; border-radius:5px; text-align:center; border:1px solid #d6d6d8; margin-top:20px; font-weight:bold;'>
+                            ⬆️ 검색 리스트로 이동
+                        </div>
+                    </a>
+                    """, 
+                    unsafe_allow_html=True
+                )
 
             with col_right:
                 fig = create_chart_figure(row['Code'], row['Name'], row['Note'], scenario_lines)
