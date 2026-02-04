@@ -11,6 +11,7 @@ import os
 import urllib.request
 import math
 import io
+import time
 
 # ---------------------------------------------------------
 # 1. 페이지 설정
@@ -19,20 +20,15 @@ st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wid
 
 st.markdown("""
     <style>
-        .block-container {padding-top: 2rem; padding-bottom: 5rem;}
+        .block-container {padding-top: 1rem; padding-bottom: 5rem;}
         html {scroll-behavior: smooth;}
         .stButton button {width: 100%; border-radius: 5px;}
-        /* 테이블 헤더 스타일 */
+        /* 테이블 헤더 숨김 및 스타일 */
         thead tr th:first-child {display:none}
         tbody th {display:none}
-        
-        /* 버튼 스타일링 */
-        .chart-btn {
-            background-color: #e3f2fd; color: #1565c0; 
-            border: 1px solid #1565c0; border-radius: 5px; 
-            padding: 5px 10px; cursor: pointer; text-decoration: none; font-size: 12px;
+        .stock-row {
+            padding: 10px 0; border-bottom: 1px solid #eee;
         }
-        .chart-btn:hover {background-color: #bbdefb;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -200,9 +196,8 @@ def main():
 
     # 헤더
     c1, c2 = st.columns([3, 1])
-    c1.title("🚜 QUANT FARMING V9.9")
-    c1.markdown("파종선 밑에서 올라와 **딱 붙어있는(2% 이내)** 종목만 집중 타격")
-    c2.markdown("### ")
+    c1.title("🚜 QUANT FARMING V9.91")
+    c1.markdown("**모바일 최적화 Ver** | 2% 맥점 타점 정밀 분석")
     
     st.divider()
 
@@ -222,7 +217,15 @@ def main():
         st_mode = 'N1' if "농사 A" in mode else 'N2'
         mkt_code = 'KRX' if mkt_opt == '전체' else mkt_opt
         
-        with st.status("🔍 데이터 스캔 중...", expanded=True) as status:
+        # ------------------------------------------------------
+        # 모바일용 프로그레스 바 구현
+        # ------------------------------------------------------
+        status_text = st.empty()
+        progress_bar = st.progress(0)
+        
+        status_text.info("📡 데이터 수집 중... (잠시만 기다려주세요)")
+        
+        try:
             stocks = fdr.StockListing(mkt_code)
             stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
             if 'Close' in stocks.columns:
@@ -231,38 +234,53 @@ def main():
                 stocks = stocks[(stocks['Close'] >= min_p) & (stocks['Close'] <= max_p)]
             
             target_list = stocks.to_dict('records')
+            total_cnt = len(target_list)
+            
+            status_text.info(f"🔍 총 {total_cnt}개 종목 분석 시작!")
             results = []
+            
+            # 진행상황 업데이트용 변수
+            done_cnt = 0
             
             with ThreadPoolExecutor(max_workers=10) as exe:
                 futures = {exe.submit(analyze_nongsa, r, st_mode): r for r in target_list}
+                
                 for f in as_completed(futures):
                     res = f.result()
                     if res: results.append(res)
-            
-            status.update(label="✅ 완료!", state="complete", expanded=False)
+                    
+                    done_cnt += 1
+                    # 5% 단위로 UI 업데이트 (너무 잦은 업데이트 방지)
+                    if done_cnt % 20 == 0 or done_cnt == total_cnt:
+                        percent = int((done_cnt / total_cnt) * 100)
+                        progress_bar.progress(percent / 100)
+                        status_text.markdown(f"**분석 중... ({done_cnt} / {total_cnt}) — {percent}% 완료**")
+
+            progress_bar.empty() # 완료 후 바 숨김
+            status_text.success(f"✅ 분석 완료! 총 {len(results)}개 발견")
             
             if results:
                 st.session_state.results = pd.DataFrame(results).sort_values('Change', ascending=False)
-                st.success(f"{len(results)}개 종목 발견!")
             else:
                 st.session_state.results = pd.DataFrame()
                 st.warning("결과 없음")
+
+        except Exception as e:
+            st.error(f"오류: {e}")
 
     # 결과 표시
     if st.session_state.results is not None and not st.session_state.results.empty:
         df = st.session_state.results
         
-        # 엑셀/복사 기능
         ec1, ec2 = st.columns([1, 4])
         with ec1:
             csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 엑셀 다운로드", csv, "farming_list.csv", "text/csv")
+            st.download_button("📥 엑셀 저장", csv, "farming_list.csv", "text/csv")
         with ec2:
             code_list = ";".join(df['Code'].astype(str).tolist())
-            with st.expander("📋 전체 종목코드 복사 (클릭)"):
+            with st.expander("📋 종목코드 복사"):
                 st.code(code_list, language=None)
 
-        # 페이징
         items_per_page = 5
         total_pages = math.ceil(len(df) / items_per_page)
         start_idx = (st.session_state.page - 1) * items_per_page
@@ -271,7 +289,6 @@ def main():
         st.markdown("<div id='list_top'></div>", unsafe_allow_html=True)
         st.markdown(f"### 📋 검색 결과 (Page {st.session_state.page}/{total_pages})")
 
-        # 커스텀 리스트 렌더링
         for idx, row in df_page.iterrows():
             with st.container():
                 c_1, c_2, c_3, c_4, c_5, c_6 = st.columns([1.5, 1, 2, 1, 1.5, 1])
@@ -281,13 +298,11 @@ def main():
                 c_4.write(f"{row['Close']:,}원")
                 c_5.write(f"기준: {row['Support']:,}원")
                 
-                # 차트 보기 버튼
-                if c_6.button("📊 차트 보기", key=f"btn_{row['Code']}"):
+                if c_6.button("📊 차트", key=f"btn_{row['Code']}"):
                     st.session_state.selected_stock = row['Code']
 
-                st.markdown("---", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
-        # 페이지네이션
         col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns([1, 1, 2, 1, 1])
         def change_page(p): st.session_state.page = p
         
@@ -300,7 +315,6 @@ def main():
         with col_p5: 
             if st.session_state.page < total_pages: st.button("맨뒤 ⏩", on_click=change_page, args=(total_pages,))
 
-        # 차트 섹션
         if st.session_state.selected_stock:
             sel_row = df[df['Code'] == st.session_state.selected_stock].iloc[0]
             st.markdown(f"### 📊 정밀 분석: {sel_row['Name']}")
@@ -310,7 +324,6 @@ def main():
             with chart_col1:
                 st.info(f"**맥점(기준): {sel_row['Support']:,}원**")
                 
-                # 분할 매수 버튼식 UI
                 st.write("🔧 **분할 파종 설정**")
                 cols_lv = st.columns(4)
                 if cols_lv[0].button("1차"): st.session_state.split_lv = 1
@@ -330,11 +343,9 @@ def main():
                     scenario_lines.append((label, p, colors[i-1]))
                     share_plan += f"\n👉 {label}: {p:,}원"
 
-                # 공유 텍스트 (코드 블록으로 복사 쉽게)
                 share_txt = f"[🚜 농사매매]\n{sel_row['Name']}({sel_row['Code']})\n현재: {sel_row['Close']:,}원\n타점: {sel_row['Note']}\n기준: {sel_row['Support']:,}원\n{share_plan if st.session_state.split_lv > 1 else ''}"
                 st.code(share_txt, language="text")
                 
-                # 리스트 이동 버튼
                 st.markdown("<a href='#list_top'><button style='width:100%; padding:10px; background:#f0f2f6; border:1px solid #ccc; border-radius:5px; font-weight:bold; cursor:pointer;'>⬆️ 리스트로 이동</button></a>", unsafe_allow_html=True)
 
             with chart_col2:
