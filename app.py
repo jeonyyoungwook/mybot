@@ -13,6 +13,11 @@ import math
 import time
 import requests
 import warnings
+import FinanceDataReader as fdr
+import streamlit as st
+
+# [버전 확인용 코드] 화면 맨 위에 현재 설치된 버전을 표시합니다.
+st.error(f"현재 설치된 fdr 버전: {fdr.__version__}") 
 
 # ---------------------------------------------------------
 # [핵심 패치] KRX 강제 접속 및 SSL 경고 무시 설정 (업데이트됨)
@@ -423,3 +428,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
