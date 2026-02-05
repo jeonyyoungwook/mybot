@@ -48,8 +48,28 @@ def set_font_korean():
 FONT_NAME = set_font_korean()
 
 # ---------------------------------------------------------
-# 2. 로직 및 데이터 (V9.8 동일)
+# 2. 로직 및 데이터 (수정됨: 종목 리스트 캐싱 및 예외처리)
 # ---------------------------------------------------------
+
+# ★ 추가된 함수: 종목 리스트를 캐싱하여 KRX 서버 부하/차단 방지 및 오류 시 우회 시도
+@st.cache_data(ttl=3600)  # 1시간 동안 데이터 유지
+def load_stock_listing(market_option):
+    mkt_code = 'KRX' if market_option == '전체' else market_option
+    try:
+        # 1차 시도: 일반적인 방식
+        return fdr.StockListing(mkt_code)
+    except Exception as e:
+        # 2차 시도: '전체' 검색 실패 시 KOSPI와 KOSDAQ를 따로 받아 병합 (KRX 서버 오류 우회)
+        if mkt_code == 'KRX':
+            try:
+                kospi = fdr.StockListing('KOSPI')
+                kosdaq = fdr.StockListing('KOSDAQ')
+                return pd.concat([kospi, kosdaq])
+            except:
+                pass
+        # 그래도 실패하면 빈 데이터프레임 반환하지 않고 에러 발생시켜 알림
+        raise e
+
 def calculate_indicators(df):
     cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     for c in cols:
@@ -196,8 +216,8 @@ def main():
 
     # 헤더
     c1, c2 = st.columns([3, 1])
-    c1.title("🚜 QUANT FARMING V9.91")
-    c1.markdown("**모바일 최적화 Ver** | 2% 맥점 타점 정밀 분석")
+    c1.title("🚜 QUANT FARMING V9.92") # 버전 업데이트
+    c1.markdown("**모바일 최적화 Ver** | KRX 접속 안정화 패치 적용")
     
     st.divider()
 
@@ -215,7 +235,6 @@ def main():
         st.session_state.page = 1
         st.session_state.selected_stock = None
         st_mode = 'N1' if "농사 A" in mode else 'N2'
-        mkt_code = 'KRX' if mkt_opt == '전체' else mkt_opt
         
         # ------------------------------------------------------
         # 모바일용 프로그레스 바 구현
@@ -223,10 +242,13 @@ def main():
         status_text = st.empty()
         progress_bar = st.progress(0)
         
-        status_text.info("📡 데이터 수집 중... (잠시만 기다려주세요)")
+        status_text.info("📡 KRX 데이터 수신 중... (안정화 모드)")
         
         try:
-            stocks = fdr.StockListing(mkt_code)
+            # [수정됨] 새로 만든 안전한 함수 호출
+            stocks = load_stock_listing(mkt_opt)
+            
+            # 스팩 등 제외 로직 유지
             stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
             if 'Close' in stocks.columns:
                 stocks['Close'] = pd.to_numeric(stocks['Close'].astype(str).str.replace(',', ''), errors='coerce')
@@ -239,7 +261,6 @@ def main():
             status_text.info(f"🔍 총 {total_cnt}개 종목 분석 시작!")
             results = []
             
-            # 진행상황 업데이트용 변수
             done_cnt = 0
             
             with ThreadPoolExecutor(max_workers=10) as exe:
@@ -250,25 +271,25 @@ def main():
                     if res: results.append(res)
                     
                     done_cnt += 1
-                    # 5% 단위로 UI 업데이트 (너무 잦은 업데이트 방지)
                     if done_cnt % 20 == 0 or done_cnt == total_cnt:
                         percent = int((done_cnt / total_cnt) * 100)
                         progress_bar.progress(percent / 100)
                         status_text.markdown(f"**분석 중... ({done_cnt} / {total_cnt}) — {percent}% 완료**")
 
-            progress_bar.empty() # 완료 후 바 숨김
+            progress_bar.empty()
             status_text.success(f"✅ 분석 완료! 총 {len(results)}개 발견")
             
             if results:
                 st.session_state.results = pd.DataFrame(results).sort_values('Change', ascending=False)
             else:
                 st.session_state.results = pd.DataFrame()
-                st.warning("결과 없음")
+                st.warning("조건에 맞는 종목이 없습니다.")
 
         except Exception as e:
-            st.error(f"오류: {e}")
+            st.error(f"⚠️ KRX 데이터 수신 오류: {e}")
+            st.error("잠시 후 다시 시도하거나, 'pip install -U finance-datareader'로 라이브러리를 업데이트하세요.")
 
-    # 결과 표시
+    # 결과 표시 로직 (기존과 동일)
     if st.session_state.results is not None and not st.session_state.results.empty:
         df = st.session_state.results
         
