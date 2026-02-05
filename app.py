@@ -10,11 +10,10 @@ from datetime import datetime, timedelta
 import os
 import urllib.request
 import math
-import io
 import time
 
 # ---------------------------------------------------------
-# 1. 페이지 설정
+# 1. 페이지 설정 및 스타일 (버튼 디자인 적용)
 # ---------------------------------------------------------
 st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wide")
 
@@ -22,13 +21,29 @@ st.markdown("""
     <style>
         .block-container {padding-top: 1rem; padding-bottom: 5rem;}
         html {scroll-behavior: smooth;}
-        .stButton button {width: 100%; border-radius: 5px;}
-        /* 테이블 헤더 숨김 및 스타일 */
+        
+        /* 라디오 버튼을 일반 버튼처럼 보이게 하는 CSS */
+        div.row-widget.stRadio > div {flex-direction: row; gap: 10px;}
+        div.row-widget.stRadio > div > label {
+            background-color: #f0f2f6;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: bold;
+        }
+        div.row-widget.stRadio > div > label:hover {
+            background-color: #e0e0e0;
+        }
+        /* 선택된 항목 스타일 */
+        div.row-widget.stRadio > div > label[data-baseweb="radio"] > div:first-child {
+            display: none; /* 원래 라디오 동그라미 숨김 */
+        }
+        
         thead tr th:first-child {display:none}
         tbody th {display:none}
-        .stock-row {
-            padding: 10px 0; border-bottom: 1px solid #eee;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -48,27 +63,23 @@ def set_font_korean():
 FONT_NAME = set_font_korean()
 
 # ---------------------------------------------------------
-# 2. 로직 및 데이터 (수정됨: 종목 리스트 캐싱 및 예외처리)
+# 2. 로직 및 데이터
 # ---------------------------------------------------------
 
-# ★ 추가된 함수: 종목 리스트를 캐싱하여 KRX 서버 부하/차단 방지 및 오류 시 우회 시도
-@st.cache_data(ttl=3600)  # 1시간 동안 데이터 유지
+@st.cache_data(ttl=600)
 def load_stock_listing(market_option):
     mkt_code = 'KRX' if market_option == '전체' else market_option
     try:
-        # 1차 시도: 일반적인 방식
         return fdr.StockListing(mkt_code)
-    except Exception as e:
-        # 2차 시도: '전체' 검색 실패 시 KOSPI와 KOSDAQ를 따로 받아 병합 (KRX 서버 오류 우회)
-        if mkt_code == 'KRX':
-            try:
-                kospi = fdr.StockListing('KOSPI')
-                kosdaq = fdr.StockListing('KOSDAQ')
-                return pd.concat([kospi, kosdaq])
-            except:
-                pass
-        # 그래도 실패하면 빈 데이터프레임 반환하지 않고 에러 발생시켜 알림
-        raise e
+    except Exception:
+        # 1차 실패 시 KOSPI/KOSDAQ 개별 호출 후 병합 시도
+        try:
+            kosp = fdr.StockListing('KOSPI')
+            kosd = fdr.StockListing('KOSDAQ')
+            return pd.concat([kosp, kosd])
+        except Exception as e:
+            # 여기도 실패하면 에러 반환
+            raise e
 
 def calculate_indicators(df):
     cols = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -215,40 +226,52 @@ def main():
     if 'split_lv' not in st.session_state: st.session_state.split_lv = 1
 
     # 헤더
-    c1, c2 = st.columns([3, 1])
-    c1.title("🚜 QUANT FARMING V9.92") # 버전 업데이트
-    c1.markdown("**모바일 최적화 Ver** | KRX 접속 안정화 패치 적용")
+    st.title("🚜 QUANT FARMING V9.94") 
+    st.markdown("**버튼 UI 적용** | 가격 입력 오류 수정 완료")
     
     st.divider()
 
-    # 검색 패널
-    col1, col2, col3, col4, col5 = st.columns([1.5, 1, 1, 1, 0.8])
-    with col1: mode = st.selectbox("📋 전략", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"])
-    with col2: mkt_opt = st.selectbox("🏢 시장", ["전체", "KOSPI", "KOSDAQ"])
-    with col3: min_p = st.number_input("📉 최소가", 1000, step=100)
-    with col4: max_p = st.number_input("📈 최대가", 200000, step=1000)
-    with col5:
+    # --------------------------------------------------------------------------------
+    # UI 변경: 버튼형 선택 + 가격 설정 오류 수정 (핵심 수정 부분)
+    # --------------------------------------------------------------------------------
+    
+    col_opt1, col_opt2 = st.columns(2)
+    with col_opt1:
+        st.write("📋 **전략 선택**")
+        # 가로형 라디오 버튼 사용
+        mode = st.radio("전략", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"], horizontal=True, label_visibility="collapsed")
+    with col_opt2:
+        st.write("🏢 **시장 선택**")
+        mkt_opt = st.radio("시장", ["전체", "KOSPI", "KOSDAQ"], horizontal=True, label_visibility="collapsed")
+    
+    st.markdown("---")
+
+    # [수정됨] min_value=0으로 설정하여 사용자가 자유롭게 값을 줄일 수 있게 함
+    col_price1, col_price2, col_btn = st.columns([1, 1, 1])
+    
+    with col_price1:
+        min_p = st.number_input("📉 최소가 (원)", value=1000, min_value=0, step=100)
+    with col_price2:
+        # 여기가 문제였음: min_value를 0으로 낮춰서 해결
+        max_p = st.number_input("📈 최대가 (원)", value=200000, min_value=0, step=1000)
+    with col_btn:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) 
-        run_btn = st.button("🚀 검색", type="primary")
+        run_btn = st.button("🚀 검색 시작", type="primary", use_container_width=True)
 
     if run_btn:
         st.session_state.page = 1
         st.session_state.selected_stock = None
         st_mode = 'N1' if "농사 A" in mode else 'N2'
         
-        # ------------------------------------------------------
-        # 모바일용 프로그레스 바 구현
-        # ------------------------------------------------------
         status_text = st.empty()
         progress_bar = st.progress(0)
         
-        status_text.info("📡 KRX 데이터 수신 중... (안정화 모드)")
+        status_text.info("📡 KRX 데이터 서버 접속 중...")
         
         try:
-            # [수정됨] 새로 만든 안전한 함수 호출
+            # KRX 리스트 불러오기 (에러 방지 로직 포함)
             stocks = load_stock_listing(mkt_opt)
             
-            # 스팩 등 제외 로직 유지
             stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
             if 'Close' in stocks.columns:
                 stocks['Close'] = pd.to_numeric(stocks['Close'].astype(str).str.replace(',', ''), errors='coerce')
@@ -286,10 +309,11 @@ def main():
                 st.warning("조건에 맞는 종목이 없습니다.")
 
         except Exception as e:
-            st.error(f"⚠️ KRX 데이터 수신 오류: {e}")
-            st.error("잠시 후 다시 시도하거나, 'pip install -U finance-datareader'로 라이브러리를 업데이트하세요.")
+            st.error("🚨 데이터 수신 오류 발생!")
+            st.error(f"내용: {e}")
+            st.warning("💡 팁: 스트림릿 클라우드를 사용 중이라면 'requirements.txt' 파일을 확인해주세요. (아래 설명 참조)")
 
-    # 결과 표시 로직 (기존과 동일)
+    # 결과 표시
     if st.session_state.results is not None and not st.session_state.results.empty:
         df = st.session_state.results
         
