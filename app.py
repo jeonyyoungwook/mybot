@@ -15,29 +15,39 @@ import requests
 import warnings
 
 # ---------------------------------------------------------
-# [핵심 패치] KRX 강제 접속 및 SSL 경고 무시 설정
+# [핵심 패치] KRX 강제 접속 및 SSL 경고 무시 설정 (업데이트됨)
 # ---------------------------------------------------------
 # SSL 경고 메시지 숨김
 warnings.filterwarnings("ignore")
 
 # Requests 라이브러리 전체를 패치하여 봇 탐지 우회
 def patch_requests():
+    """
+    FinanceDataReader가 내부적으로 사용하는 requests 라이브러리의 동작을 수정하여
+    KRX 서버의 봇 탐지를 우회하고 SSL 검증을 건너뛰도록 설정합니다.
+    """
     old_request = requests.Session.request
     
     def new_request(self, method, url, *args, **kwargs):
         headers = kwargs.get('headers', {})
-        # 최신 크롬 브라우저로 위장
-        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-        headers['Referer'] = 'http://data.krx.co.kr/'
-        headers['Accept'] = 'application/json, text/javascript, */*; q=0.01'
+        
+        # 1. 최신 크롬 브라우저 User-Agent 설정 (탐지 회피)
+        if 'User-Agent' not in headers:
+            headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        
+        # 2. KRX 데이터 시스템의 구체적인 Referer 명시 (필수)
+        headers['Referer'] = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101'
+        
         kwargs['headers'] = headers
-        # SSL 인증서 검증 끄기 (서버 접속 차단 해제)
+        
+        # 3. SSL 인증서 검증 끄기 (서버 접속 차단 해제)
         kwargs['verify'] = False 
+        
         return old_request(self, method, url, *args, **kwargs)
     
     requests.Session.request = new_request
 
-# 패치 실행
+# 패치 실행 (앱 시작 시 즉시 적용)
 patch_requests()
 
 # ---------------------------------------------------------
@@ -93,8 +103,7 @@ def load_stock_listing(market_option):
             d = fdr.StockListing('KOSDAQ')
             return pd.concat([k, d])
         except Exception:
-            # 3차 시도: 아주 간략한 비상용 리스트라도 반환 (앱 멈춤 방지)
-            # 최소한 앱이 켜지게 하기 위함
+            # 3차 시도: 오류 발생 시 None 반환
             return None
 
 def calculate_indicators(df):
@@ -287,7 +296,7 @@ def main():
             stocks = load_stock_listing(mkt_opt)
             
             if stocks is None or stocks.empty:
-                st.error("❌ KRX 서버가 강력하게 차단 중입니다. `requirements.txt`에 `finance-datareader>=0.9.60`이 포함되었는지 꼭 확인해주세요.")
+                st.error("❌ KRX 서버가 강력하게 차단 중입니다. `requirements.txt`에 `finance-datareader>=0.9.72`가 포함되었는지 꼭 확인해주세요.")
             else:
                 stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
                 if 'Close' in stocks.columns:
@@ -328,7 +337,7 @@ def main():
         except Exception as e:
             st.error(f"🚨 오류 발생: {e}")
 
-    # 결과 및 차트 표시 (기존 유지)
+    # 결과 및 차트 표시
     if st.session_state.results is not None and not st.session_state.results.empty:
         df = st.session_state.results
         
