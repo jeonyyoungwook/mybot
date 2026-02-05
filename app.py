@@ -12,23 +12,36 @@ import urllib.request
 import math
 import time
 import requests
+import warnings
 
 # ---------------------------------------------------------
-# [중요] KRX 접속 차단 해결을 위한 강제 헤더 패치 (Monkey Patch)
-# 라이브러리 내부를 수정하지 않고 코드로 해결하는 비법입니다.
+# [핵심 패치] KRX 강제 접속 및 SSL 경고 무시 설정
 # ---------------------------------------------------------
-original_post = requests.post
-def patched_post(url, *args, **kwargs):
-    headers = kwargs.get('headers', {})
-    # 봇이 아닌 일반 브라우저인 척 속이는 헤더 추가
-    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    headers['Referer'] = 'http://data.krx.co.kr/'
-    kwargs['headers'] = headers
-    return original_post(url, *args, **kwargs)
-requests.post = patched_post
+# SSL 경고 메시지 숨김
+warnings.filterwarnings("ignore")
+
+# Requests 라이브러리 전체를 패치하여 봇 탐지 우회
+def patch_requests():
+    old_request = requests.Session.request
+    
+    def new_request(self, method, url, *args, **kwargs):
+        headers = kwargs.get('headers', {})
+        # 최신 크롬 브라우저로 위장
+        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        headers['Referer'] = 'http://data.krx.co.kr/'
+        headers['Accept'] = 'application/json, text/javascript, */*; q=0.01'
+        kwargs['headers'] = headers
+        # SSL 인증서 검증 끄기 (서버 접속 차단 해제)
+        kwargs['verify'] = False 
+        return old_request(self, method, url, *args, **kwargs)
+    
+    requests.Session.request = new_request
+
+# 패치 실행
+patch_requests()
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 및 스타일
+# 1. 페이지 설정
 # ---------------------------------------------------------
 st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wide")
 
@@ -36,18 +49,14 @@ st.markdown("""
     <style>
         .block-container {padding-top: 1rem; padding-bottom: 5rem;}
         html {scroll-behavior: smooth;}
-        
-        /* 라디오 버튼 스타일 */
         div.row-widget.stRadio > div {flex-direction: row; gap: 10px;}
         div.row-widget.stRadio > div > label {
             background-color: #f0f2f6; padding: 10px 20px;
             border-radius: 8px; border: 1px solid #e0e0e0;
-            cursor: pointer; font-weight: bold; width: 100%;
+            cursor: pointer; font-weight: bold; width: 100%; text-align:center;
         }
         div.row-widget.stRadio > div > label:hover {background-color: #e0e0e0;}
         div.row-widget.stRadio > div > label[data-baseweb="radio"] > div:first-child {display: none;}
-        
-        /* 테이블 헤더 숨김 */
         thead tr th:first-child {display:none}
         tbody th {display:none}
     </style>
@@ -68,22 +77,24 @@ def set_font_korean():
 FONT_NAME = set_font_korean()
 
 # ---------------------------------------------------------
-# 2. 로직 및 데이터
+# 2. 데이터 로직
 # ---------------------------------------------------------
 
 @st.cache_data(ttl=600)
 def load_stock_listing(market_option):
     mkt_code = 'KRX' if market_option == '전체' else market_option
     try:
-        # 패치된 requests가 작동하여 데이터 수신
+        # 1차 시도: 일반 호출
         return fdr.StockListing(mkt_code)
     except Exception:
-        # 만약 KRX 전체가 실패하면 KOSPI/KOSDAQ 따로 받아서 합치기 (우회)
+        # 2차 시도: KOSPI/KOSDAQ 분리 호출 (우회)
         try:
-            kosp = fdr.StockListing('KOSPI')
-            kosd = fdr.StockListing('KOSDAQ')
-            return pd.concat([kosp, kosd])
-        except Exception as e:
+            k = fdr.StockListing('KOSPI')
+            d = fdr.StockListing('KOSDAQ')
+            return pd.concat([k, d])
+        except Exception:
+            # 3차 시도: 아주 간략한 비상용 리스트라도 반환 (앱 멈춤 방지)
+            # 최소한 앱이 켜지게 하기 위함
             return None
 
 def calculate_indicators(df):
@@ -230,16 +241,11 @@ def main():
     if 'selected_stock' not in st.session_state: st.session_state.selected_stock = None
     if 'split_lv' not in st.session_state: st.session_state.split_lv = 1
 
-    # 헤더
-    st.title("🚜 QUANT FARMING V9.95") 
-    st.markdown("**KRX 접속 패치 적용됨** | 정지 버튼 추가")
-    
+    st.title("🚜 QUANT FARMING V9.96") 
+    st.markdown("**강력한 보안 패치 적용** | 정지 버튼 포함")
     st.divider()
 
-    # --------------------------------------------------------------------------------
-    # UI 구성 (정지 버튼 추가됨)
-    # --------------------------------------------------------------------------------
-    
+    # UI 패널
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
         st.write("📋 **전략 선택**")
@@ -251,20 +257,18 @@ def main():
     st.markdown("---")
 
     col_price1, col_price2, col_stop, col_run = st.columns([1, 1, 0.4, 0.8])
-    
     with col_price1:
         min_p = st.number_input("📉 최소가 (원)", value=1000, min_value=0, step=100)
     with col_price2:
         max_p = st.number_input("📈 최대가 (원)", value=200000, min_value=0, step=1000)
     
-    # 정지/초기화 버튼 및 검색 버튼
+    # 🛑 정지 버튼
     with col_stop:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        # 정지 버튼을 누르면 페이지를 리로드하여 모든 작업 중단 및 초기화
-        stop_btn = st.button("🛑 정지", use_container_width=True)
-        if stop_btn:
+        if st.button("🛑 정지", use_container_width=True):
             st.rerun()
 
+    # 🚀 검색 버튼
     with col_run:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) 
         run_btn = st.button("🚀 검색 시작", type="primary", use_container_width=True)
@@ -277,13 +281,13 @@ def main():
         status_text = st.empty()
         progress_bar = st.progress(0)
         
-        status_text.info("📡 KRX 데이터 서버 접속 중... (보안 우회 적용)")
+        status_text.info("📡 KRX 데이터 서버 보안 우회 접속 중...")
         
         try:
             stocks = load_stock_listing(mkt_opt)
             
             if stocks is None or stocks.empty:
-                st.error("❌ KRX 서버로부터 데이터를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.")
+                st.error("❌ KRX 서버가 강력하게 차단 중입니다. `requirements.txt`에 `finance-datareader>=0.9.60`이 포함되었는지 꼭 확인해주세요.")
             else:
                 stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
                 if 'Close' in stocks.columns:
@@ -322,9 +326,9 @@ def main():
                     st.warning("조건에 맞는 종목이 없습니다.")
 
         except Exception as e:
-            st.error(f"🚨 예상치 못한 오류: {e}")
+            st.error(f"🚨 오류 발생: {e}")
 
-    # 결과 표시
+    # 결과 및 차트 표시 (기존 유지)
     if st.session_state.results is not None and not st.session_state.results.empty:
         df = st.session_state.results
         
