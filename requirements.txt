@@ -1,10 +1,8 @@
 streamlit
-finance-datareader>=0.9.90
 pandas
-matplotlib
 numpy
+matplotlib
+finance-datareader>=0.9.60
+requests
 lxml
 beautifulsoup4
-tqdm
-plotly
-requests
