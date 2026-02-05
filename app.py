@@ -11,9 +11,24 @@ import os
 import urllib.request
 import math
 import time
+import requests
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 및 스타일 (버튼 디자인 적용)
+# [중요] KRX 접속 차단 해결을 위한 강제 헤더 패치 (Monkey Patch)
+# 라이브러리 내부를 수정하지 않고 코드로 해결하는 비법입니다.
+# ---------------------------------------------------------
+original_post = requests.post
+def patched_post(url, *args, **kwargs):
+    headers = kwargs.get('headers', {})
+    # 봇이 아닌 일반 브라우저인 척 속이는 헤더 추가
+    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    headers['Referer'] = 'http://data.krx.co.kr/'
+    kwargs['headers'] = headers
+    return original_post(url, *args, **kwargs)
+requests.post = patched_post
+
+# ---------------------------------------------------------
+# 1. 페이지 설정 및 스타일
 # ---------------------------------------------------------
 st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wide")
 
@@ -22,26 +37,17 @@ st.markdown("""
         .block-container {padding-top: 1rem; padding-bottom: 5rem;}
         html {scroll-behavior: smooth;}
         
-        /* 라디오 버튼을 일반 버튼처럼 보이게 하는 CSS */
+        /* 라디오 버튼 스타일 */
         div.row-widget.stRadio > div {flex-direction: row; gap: 10px;}
         div.row-widget.stRadio > div > label {
-            background-color: #f0f2f6;
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-align: center;
-            font-weight: bold;
+            background-color: #f0f2f6; padding: 10px 20px;
+            border-radius: 8px; border: 1px solid #e0e0e0;
+            cursor: pointer; font-weight: bold; width: 100%;
         }
-        div.row-widget.stRadio > div > label:hover {
-            background-color: #e0e0e0;
-        }
-        /* 선택된 항목 스타일 */
-        div.row-widget.stRadio > div > label[data-baseweb="radio"] > div:first-child {
-            display: none; /* 원래 라디오 동그라미 숨김 */
-        }
+        div.row-widget.stRadio > div > label:hover {background-color: #e0e0e0;}
+        div.row-widget.stRadio > div > label[data-baseweb="radio"] > div:first-child {display: none;}
         
+        /* 테이블 헤더 숨김 */
         thead tr th:first-child {display:none}
         tbody th {display:none}
     </style>
@@ -53,7 +59,6 @@ def set_font_korean():
     if not os.path.exists(font_path):
         url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
         urllib.request.urlretrieve(url, font_path)
-    
     fe = fm.FontEntry(fname=font_path, name='NanumGothic')
     fm.fontManager.ttflist.insert(0, fe)
     plt.rc('font', family='NanumGothic')
@@ -70,16 +75,16 @@ FONT_NAME = set_font_korean()
 def load_stock_listing(market_option):
     mkt_code = 'KRX' if market_option == '전체' else market_option
     try:
+        # 패치된 requests가 작동하여 데이터 수신
         return fdr.StockListing(mkt_code)
     except Exception:
-        # 1차 실패 시 KOSPI/KOSDAQ 개별 호출 후 병합 시도
+        # 만약 KRX 전체가 실패하면 KOSPI/KOSDAQ 따로 받아서 합치기 (우회)
         try:
             kosp = fdr.StockListing('KOSPI')
             kosd = fdr.StockListing('KOSDAQ')
             return pd.concat([kosp, kosd])
         except Exception as e:
-            # 여기도 실패하면 에러 반환
-            raise e
+            return None
 
 def calculate_indicators(df):
     cols = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -226,19 +231,18 @@ def main():
     if 'split_lv' not in st.session_state: st.session_state.split_lv = 1
 
     # 헤더
-    st.title("🚜 QUANT FARMING V9.94") 
-    st.markdown("**버튼 UI 적용** | 가격 입력 오류 수정 완료")
+    st.title("🚜 QUANT FARMING V9.95") 
+    st.markdown("**KRX 접속 패치 적용됨** | 정지 버튼 추가")
     
     st.divider()
 
     # --------------------------------------------------------------------------------
-    # UI 변경: 버튼형 선택 + 가격 설정 오류 수정 (핵심 수정 부분)
+    # UI 구성 (정지 버튼 추가됨)
     # --------------------------------------------------------------------------------
     
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
         st.write("📋 **전략 선택**")
-        # 가로형 라디오 버튼 사용
         mode = st.radio("전략", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"], horizontal=True, label_visibility="collapsed")
     with col_opt2:
         st.write("🏢 **시장 선택**")
@@ -246,15 +250,22 @@ def main():
     
     st.markdown("---")
 
-    # [수정됨] min_value=0으로 설정하여 사용자가 자유롭게 값을 줄일 수 있게 함
-    col_price1, col_price2, col_btn = st.columns([1, 1, 1])
+    col_price1, col_price2, col_stop, col_run = st.columns([1, 1, 0.4, 0.8])
     
     with col_price1:
         min_p = st.number_input("📉 최소가 (원)", value=1000, min_value=0, step=100)
     with col_price2:
-        # 여기가 문제였음: min_value를 0으로 낮춰서 해결
         max_p = st.number_input("📈 최대가 (원)", value=200000, min_value=0, step=1000)
-    with col_btn:
+    
+    # 정지/초기화 버튼 및 검색 버튼
+    with col_stop:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        # 정지 버튼을 누르면 페이지를 리로드하여 모든 작업 중단 및 초기화
+        stop_btn = st.button("🛑 정지", use_container_width=True)
+        if stop_btn:
+            st.rerun()
+
+    with col_run:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) 
         run_btn = st.button("🚀 검색 시작", type="primary", use_container_width=True)
 
@@ -266,52 +277,52 @@ def main():
         status_text = st.empty()
         progress_bar = st.progress(0)
         
-        status_text.info("📡 KRX 데이터 서버 접속 중...")
+        status_text.info("📡 KRX 데이터 서버 접속 중... (보안 우회 적용)")
         
         try:
-            # KRX 리스트 불러오기 (에러 방지 로직 포함)
             stocks = load_stock_listing(mkt_opt)
             
-            stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
-            if 'Close' in stocks.columns:
-                stocks['Close'] = pd.to_numeric(stocks['Close'].astype(str).str.replace(',', ''), errors='coerce')
-                stocks = stocks.dropna(subset=['Close'])
-                stocks = stocks[(stocks['Close'] >= min_p) & (stocks['Close'] <= max_p)]
-            
-            target_list = stocks.to_dict('records')
-            total_cnt = len(target_list)
-            
-            status_text.info(f"🔍 총 {total_cnt}개 종목 분석 시작!")
-            results = []
-            
-            done_cnt = 0
-            
-            with ThreadPoolExecutor(max_workers=10) as exe:
-                futures = {exe.submit(analyze_nongsa, r, st_mode): r for r in target_list}
-                
-                for f in as_completed(futures):
-                    res = f.result()
-                    if res: results.append(res)
-                    
-                    done_cnt += 1
-                    if done_cnt % 20 == 0 or done_cnt == total_cnt:
-                        percent = int((done_cnt / total_cnt) * 100)
-                        progress_bar.progress(percent / 100)
-                        status_text.markdown(f"**분석 중... ({done_cnt} / {total_cnt}) — {percent}% 완료**")
-
-            progress_bar.empty()
-            status_text.success(f"✅ 분석 완료! 총 {len(results)}개 발견")
-            
-            if results:
-                st.session_state.results = pd.DataFrame(results).sort_values('Change', ascending=False)
+            if stocks is None or stocks.empty:
+                st.error("❌ KRX 서버로부터 데이터를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.")
             else:
-                st.session_state.results = pd.DataFrame()
-                st.warning("조건에 맞는 종목이 없습니다.")
+                stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
+                if 'Close' in stocks.columns:
+                    stocks['Close'] = pd.to_numeric(stocks['Close'].astype(str).str.replace(',', ''), errors='coerce')
+                    stocks = stocks.dropna(subset=['Close'])
+                    stocks = stocks[(stocks['Close'] >= min_p) & (stocks['Close'] <= max_p)]
+                
+                target_list = stocks.to_dict('records')
+                total_cnt = len(target_list)
+                
+                status_text.info(f"🔍 총 {total_cnt}개 종목 분석 시작!")
+                results = []
+                
+                done_cnt = 0
+                
+                with ThreadPoolExecutor(max_workers=10) as exe:
+                    futures = {exe.submit(analyze_nongsa, r, st_mode): r for r in target_list}
+                    
+                    for f in as_completed(futures):
+                        res = f.result()
+                        if res: results.append(res)
+                        
+                        done_cnt += 1
+                        if done_cnt % 20 == 0 or done_cnt == total_cnt:
+                            percent = int((done_cnt / total_cnt) * 100)
+                            progress_bar.progress(percent / 100)
+                            status_text.markdown(f"**분석 중... ({done_cnt} / {total_cnt}) — {percent}% 완료**")
+
+                progress_bar.empty()
+                status_text.success(f"✅ 분석 완료! 총 {len(results)}개 발견")
+                
+                if results:
+                    st.session_state.results = pd.DataFrame(results).sort_values('Change', ascending=False)
+                else:
+                    st.session_state.results = pd.DataFrame()
+                    st.warning("조건에 맞는 종목이 없습니다.")
 
         except Exception as e:
-            st.error("🚨 데이터 수신 오류 발생!")
-            st.error(f"내용: {e}")
-            st.warning("💡 팁: 스트림릿 클라우드를 사용 중이라면 'requirements.txt' 파일을 확인해주세요. (아래 설명 참조)")
+            st.error(f"🚨 예상치 못한 오류: {e}")
 
     # 결과 표시
     if st.session_state.results is not None and not st.session_state.results.empty:
