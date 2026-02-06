@@ -1,426 +1,336 @@
 import streamlit as st
+import pyupbit
 import FinanceDataReader as fdr
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.dates as mdates
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
 import os
-import urllib.request
-import math
 import time
-import requests
-import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ---------------------------------------------------------
-# [핵심 패치] KRX 강제 접속 및 SSL 경고 무시 설정
-# ---------------------------------------------------------
-warnings.filterwarnings("ignore")
+# ========================================
+# [설정] 글로벌 설정
+# ========================================
+class Config:
+    MIN_DATA_DAYS = 120
+    MAX_WORKERS = 10  # 서버 부하 방지를 위해 조정
+    
+    # 전략 변수
+    BB_PERIOD = 38
+    BB_STD = 0.6
+    
+    # 기본 필터
+    MIN_VOLUME = 0 
 
-def patch_requests():
-    old_request = requests.Session.request
-    def new_request(self, method, url, *args, **kwargs):
-        headers = kwargs.get('headers', {})
-        if 'User-Agent' not in headers:
-            headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        headers['Referer'] = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101'
-        kwargs['headers'] = headers
-        kwargs['verify'] = False 
-        return old_request(self, method, url, *args, **kwargs)
-    requests.Session.request = new_request
+# ========================================
+# [폰트] 한글 폰트 설정 (깃허브 파일 연동)
+# ========================================
+# 깃허브에 올려두신 폰트 파일명과 일치해야 합니다.
+font_path = "NanumGothic.ttf" 
 
-patch_requests()
+# 폰트 파일이 없으면 기본 폰트 사용 (에러 방지)
+if os.path.exists(font_path):
+    fm.fontManager.addfont(font_path)
+    plt.rc("font", family="NanumGothic")
+else:
+    # 폰트가 없을 경우 시스템 기본 폰트 시도 (한글 깨짐 방지 노력)
+    plt.rc("font", family="DejaVu Sans")
 
-# ---------------------------------------------------------
-# 1. 페이지 설정
-# ---------------------------------------------------------
-st.set_page_config(page_title="Quant Farming Pro", page_icon="🚜", layout="wide")
+plt.rcParams["axes.unicode_minus"] = False
+
+# ========================================
+# [UI] 페이지 설정
+# ========================================
+st.set_page_config(page_title="HYBRID FARMING V11", page_icon="📈", layout="wide")
 
 st.markdown("""
     <style>
-        .block-container {padding-top: 1rem; padding-bottom: 5rem;}
-        html {scroll-behavior: smooth;}
-        div.row-widget.stRadio > div {flex-direction: row; gap: 10px;}
-        div.row-widget.stRadio > div > label {
-            background-color: #f0f2f6; padding: 10px 20px;
-            border-radius: 8px; border: 1px solid #e0e0e0;
-            cursor: pointer; font-weight: bold; width: 100%; text-align:center;
+        .main {background-color: #0e1117;}
+        div[data-testid="stMetricValue"] {font-size: 1.1rem; color: #00FF00;}
+        .info-box {
+            padding: 20px; border-radius: 12px; margin-bottom: 20px;
+            background: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            color: white; border: 1px solid #444;
         }
-        div.row-widget.stRadio > div > label:hover {background-color: #e0e0e0;}
-        div.row-widget.stRadio > div > label[data-baseweb="radio"] > div:first-child {display: none;}
-        thead tr th:first-child {display:none}
-        tbody th {display:none}
     </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
-def set_font_korean():
-    font_path = "NanumGothic.ttf"
-    if not os.path.exists(font_path):
-        url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-        urllib.request.urlretrieve(url, font_path)
-    fe = fm.FontEntry(fname=font_path, name='NanumGothic')
-    fm.fontManager.ttflist.insert(0, fe)
-    plt.rc('font', family='NanumGothic')
-    plt.rcParams['axes.unicode_minus'] = False
-    return 'NanumGothic'
-
-FONT_NAME = set_font_korean()
-
-# ---------------------------------------------------------
-# 2. 데이터 로직 (비상 모드 추가됨)
-# ---------------------------------------------------------
-
-@st.cache_data(ttl=600)
-def load_stock_listing(market_option):
-    """KRX 접속 실패 시 비상용 리스트를 반환하는 안전 장치 포함"""
+# ========================================
+# [DATA] 데이터 수집 (캐싱 적용)
+# ========================================
+@st.cache_data(ttl=3600) # 1시간마다 데이터 갱신 (서버 부하 방지)
+def get_market_data(ticker, market_type):
+    """코인과 주식 데이터를 통합해서 가져옴"""
     try:
-        # 1차 시도: 정상 KRX 접속
-        mkt_code = 'KRX' if market_option == '전체' else market_option
-        df = fdr.StockListing(mkt_code)
-        if df is None or df.empty: raise Exception("Empty")
-        return df
-    except Exception:
-        try:
-            # 2차 시도: 분리 호출
-            k = fdr.StockListing('KOSPI')
-            d = fdr.StockListing('KOSDAQ')
-            return pd.concat([k, d])
-        except Exception:
-            # 3차 시도: [비상 모드] 주요 종목 수동 리스트 반환
-            st.warning("⚠️ KRX 서버가 클라우드 IP를 차단했습니다. [비상 모드]로 주요 종목만 분석합니다.")
-            
-            # 주요 인기 종목 하드코딩 (필요시 종목 코드 추가 가능)
-            emergency_data = {
-                'Code': ['005930', '000660', '373220', '207940', '005380', '005935', '000270', '105560', '035420', '006400', 
-                         '051910', '035720', '003670', '012330', '028260', '247540', '086520', '066970', '091990', '022100',
-                         '042700', '032640', '011200', '009830', '010130', '010140', '096770', '010950', '005490', '011070'],
-                'Name': ['삼성전자', 'SK하이닉스', 'LG에너지솔루션', '삼성바이오로직스', '현대차', '삼성전자우', '기아', 'KB금융', 'NAVER', '삼성SDI',
-                         'LG화학', '카카오', '포스코퓨처엠', '현대모비스', '삼성물산', '에코프로비엠', '에코프로', '엘앤에프', '셀트리온헬스케어', '포스코DX',
-                         '한미반도체', 'LG유플러스', 'HMM', '한화솔루션', '고려아연', '삼성중공업', 'SK이노베이션', 'S-Oil', 'POSCO홀딩스', 'LG이노텍'],
-                'Market': ['KOSPI']*30, # 편의상 KOSPI로 통일
-                'Close': [70000]*30     # 임시 가격 (실제 분석 시 업데이트됨)
-            }
-            return pd.DataFrame(emergency_data)
+        df = None
+        if market_type == "COIN":
+            df = pyupbit.get_ohlcv(ticker, interval="day", count=250)
+        else: # STOCK
+            df = fdr.DataReader(ticker)
+            df = df.tail(250)
+            df = df.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume', 'Change': 'change'})
+            df['value'] = df['close'] * df['volume']
 
-def calculate_indicators(df):
-    cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-    for c in cols:
-        if c in df.columns: df[c] = pd.to_numeric(df[c], errors='coerce')
-    if len(df) < 52: return df
+        if df is None or len(df) < Config.MIN_DATA_DAYS:
+            return None
 
-    for w in [5, 20, 60, 112, 224]:
-        df[f'MA{w}'] = df['Close'].rolling(w).mean()
-
-    df['F_Mid'] = df['Close'].rolling(window=38).mean()
-    df['F_Std'] = df['Close'].rolling(window=38).std()
-    df['Farming_Line']  = df['F_Mid'] + (df['F_Std'] * 0.6)
-
-    high_9 = df['High'].rolling(window=9).max()
-    low_9 = df['Low'].rolling(window=9).min()
-    df['Tenkan'] = (high_9 + low_9) / 2
-    high_26 = df['High'].rolling(window=26).max()
-    low_26 = df['Low'].rolling(window=26).min()
-    df['Kijun'] = (high_26 + low_26) / 2
-    df['Span1'] = (df['Tenkan'] + df['Kijun']) / 2
-    high_52 = df['High'].rolling(window=52).max()
-    low_52 = df['Low'].rolling(window=52).min()
-    df['Span2'] = (high_52 + low_52) / 2
-    df['Amount'] = df['Close'] * df['Volume']
-    return df
-
-@st.cache_data(ttl=3600)
-def get_stock_data(code):
-    try:
-        df = fdr.DataReader(code, (datetime.now()-timedelta(days=730)))
-        if df is None or df.empty: return None
-        df = calculate_indicators(df)
-        return df
-    except: return None
-
-def analyze_nongsa(row, mode):
-    try:
-        code = str(row['Code']); name = row['Name']; market = row.get('Market', 'KOSDAQ')
-        df = get_stock_data(code)
-        if df is None or len(df) < 130: return None
+        # --- 지표 계산 ---
+        df['MA5'] = df['close'].rolling(5).mean()
+        df['MA20'] = df['close'].rolling(20).mean()
+        df['MA60'] = df['close'].rolling(60).mean()
         
-        curr = df['Close'].iloc[-1]; t = df.iloc[-1]; y = df.iloc[-2]
-        score_str=""; stop=0; support=0
+        ma_len = 224 if len(df) >= 224 else 120
+        df['MA224'] = df['close'].rolling(ma_len).mean()
+
+        df['F_Mid'] = df['close'].rolling(38).mean()
+        df['F_Std'] = df['close'].rolling(38).std()
+        df['Farming_Line'] = df['F_Mid'] + (df['F_Std'] * 0.6)
+
+        high_9 = df['high'].rolling(9).max()
+        low_9 = df['low'].rolling(9).min()
+        tenkan = (high_9 + low_9) / 2
+        high_26 = df['high'].rolling(26).max()
+        low_26 = df['low'].rolling(26).min()
+        kijun = (high_26 + low_26) / 2
+        df['Span1'] = (tenkan + kijun) / 2
+        high_52 = df['high'].rolling(52).max()
+        low_52 = df['low'].rolling(52).min()
+        df['Span2'] = (high_52 + low_52) / 2
         
-        ma224 = t.get('MA224', 0); ma5 = t.get('MA5', 0); span1 = t.get('Span1', 0)
-        if ma224 == 0 or ma5 == 0 or span1 == 0: return None
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+
+        return df.dropna()
+
+    except Exception as e:
+        return None
+
+# ========================================
+# [LOGIC] 분석 로직
+# ========================================
+def analyze_ticker(ticker, name, market_type, show_all):
+    df = get_market_data(ticker, market_type)
+    if df is None: return None
+
+    curr = df.iloc[-1]
+    prev = df.iloc[-2]
+    
+    close = curr['close']
+    ma224 = curr['MA224']
+    farm_line = curr['Farming_Line']
+    cloud_top = max(curr['Span1'], curr['Span2'])
+    
+    signal_type = "관망"
+    score = 0
+    target_price = close
+    is_buy_signal = False
+
+    # A. 파종선
+    gap_farm = (close - farm_line) / farm_line * 100
+    if -3.0 <= gap_farm <= 5.0 and close >= curr['MA20']:
+        signal_type = "🌾 파종선 근접"
+        score = 80 - abs(gap_farm)
+        target_price = farm_line
+        is_buy_signal = True
         
-        is_safe = (t['Close'] >= t['Open']) or (curr >= ma5)
-        if not is_safe: return None
+    # B. 224일선
+    elif ma224 > 0:
+        gap_ma = (close - ma224) / ma224 * 100
+        if -2.0 <= gap_ma <= 7.0:
+            signal_type = "🔥 224일선 돌파" if gap_ma >= 0 else "⏳ 224일선 대기"
+            score = 90 - abs(gap_ma)
+            target_price = ma224
+            is_buy_signal = True
 
-        if mode == 'N1':
-            farming_line = t.get('Farming_Line', 0)
-            if farming_line == 0: return None
-            gap = (curr - farming_line) / farming_line * 100
-            recent_lows = df['Low'].iloc[-5:].min()
-            was_below = recent_lows < farming_line
-            # 테스트를 위해 조건 완화 (실제 사용 시 원래대로)
-            if t['Amount'] > 0: 
-                score_str = f"🎯 파종 맥점 ({gap:.2f}%)" 
-                support = farming_line 
-                stop = int(support * 0.97)
+    # C. 구름대
+    elif close > cloud_top:
+        gap_cloud = (close - cloud_top) / cloud_top * 100
+        if gap_cloud <= 10.0:
+            signal_type = "☁️ 구름대 지지"
+            score = 70 - gap_cloud
+            target_price = cloud_top
+            is_buy_signal = True
 
-        elif mode == 'N2':
-            span2 = t.get('Span2', 0)
-            cloud_gap = abs(span1 - span2)
-            is_thin_cloud = (cloud_gap / curr) <= 0.04
-            cloud_bottom = min(span1, span2)
-            recent_low = df['Low'].iloc[-40:].min()
-            is_floor = (curr - recent_low) / recent_low <= 0.15
-            if is_thin_cloud and is_floor:
-                score_str = "🚜 농사 맥점 (구름대)"
-                support = min(cloud_bottom, ma224) 
-                stop = int(support * 0.96)
+    if not show_all and not is_buy_signal: return None
+    if not is_buy_signal: score = 0
 
-        if not score_str: return None
+    return {
+        'code': ticker,
+        'name': name,
+        'price': close,
+        'change': (close - prev['close']) / prev['close'] * 100,
+        'volume_money': int(curr['value'] // 1000000),
+        'signal': signal_type,
+        'score': round(score, 1),
+        'target': int(target_price),
+        'rsi': round(curr['RSI'], 1),
+        'market': market_type
+    }
 
-        return {
-            'Market': market, 'Name': name, 'Code': code, 
-            'Close': int(curr), 'Change': round((curr-y['Close'])/y['Close']*100, 2),
-            'Note': score_str, 'Target': int(curr*1.15), 'StopLoss': stop, 
-            'Support': int(support), 'Amount': int(t['Amount'])
-        }
-    except: return None
-
-def create_chart_figure(code, name, score_str, scenario_lines=None):
-    df = get_stock_data(code)
+# ========================================
+# [CHART] 차트 그리기
+# ========================================
+def draw_chart(ticker, market_type, info):
+    df = get_market_data(ticker, market_type)
     if df is None: return None
     
-    if not isinstance(df.index, pd.DatetimeIndex): df.index = pd.to_datetime(df.index)
-    plot_df = df.iloc[-150:] if len(df)>150 else df
-    dates = plot_df.index
+    df = df.iloc[-120:]
+    dates = df.index
     
-    fig = plt.figure(figsize=(12, 8), constrained_layout=True)
-    gs = fig.add_gridspec(2, 1, height_ratios=[4, 1])
-    ax1 = fig.add_subplot(gs[0, 0]); ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
+    plt.subplots_adjust(hspace=0.05)
     
-    fig.patch.set_facecolor('white')
-    ax1.set_facecolor('#fcfcfc'); ax2.set_facecolor('#fcfcfc')
-
-    if 'Span1' in plot_df.columns and 'Span2' in plot_df.columns:
-        ax1.fill_between(dates, plot_df['Span1'], plot_df['Span2'], where=plot_df['Span1']>=plot_df['Span2'], facecolor='#2ecc71', alpha=0.15, label='양운')
-        ax1.fill_between(dates, plot_df['Span1'], plot_df['Span2'], where=plot_df['Span1']<plot_df['Span2'], facecolor='#95a5a6', alpha=0.2, label='음운')
-
-    if 'MA224' in plot_df.columns: ax1.plot(dates, plot_df['MA224'], color='#2c3e50', lw=1.5, alpha=0.8, label='224일선')
-    if 'MA5' in plot_df.columns: ax1.plot(dates, plot_df['MA5'], color='#e84393', lw=1, alpha=0.6, label='5일선')
+    # Price Chart
+    ax1.plot(dates, df['MA224'], 'k-', lw=1.5, label='224일선')
+    ax1.plot(dates, df['Farming_Line'], color='purple', linestyle='--', label='파종선')
+    ax1.fill_between(dates, df['Span1'], df['Span2'], where=df['Span1']>=df['Span2'], color='green', alpha=0.1)
+    ax1.fill_between(dates, df['Span1'], df['Span2'], where=df['Span1']<df['Span2'], color='red', alpha=0.1)
     
-    if 'Farming_Line' in plot_df.columns:
-        ax1.plot(dates, plot_df['Farming_Line'], color='#8e44ad', lw=2.5, linestyle='--', label='특수 파종선')
-        ax1.text(dates[-1]+timedelta(days=2), plot_df['Farming_Line'].iloc[-1], f" {int(plot_df['Farming_Line'].iloc[-1]):,}", color='#8e44ad', fontweight='bold', va='center', fontsize=9)
-
-    opens = plot_df['Open'].values; closes = plot_df['Close'].values
-    highs = plot_df['High'].values; lows = plot_df['Low'].values
-    colors = ['#c0392b' if c >= o else '#2980b9' for c, o in zip(closes, opens)]
-    
-    ax1.bar(dates, closes - opens, bottom=opens, width=0.6, color=colors, edgecolor=colors, alpha=0.9)
-    ax1.vlines(dates, lows, highs, colors, lw=1)
-
-    if scenario_lines:
-        for label, price, color in scenario_lines:
-            ax1.axhline(price, color=color, ls='-', lw=1.2, alpha=0.9)
-            ax1.text(dates[0], price, f"{label} ▶ {int(price):,}", color=color, fontweight='bold', fontsize=10, bbox=dict(facecolor='white', edgecolor=color, boxstyle='round,pad=0.2', alpha=0.9), va='center')
-
-    ax1.plot(dates[-1], closes[-1], marker='o', markersize=20, markerfacecolor='none', markeredgecolor='#e74c3c', markeredgewidth=2)
-    ax2.bar(dates, plot_df['Volume'].values, color=colors, alpha=0.6, width=0.6)
-    ax2.grid(True, axis='y', linestyle=':', color='#bdc3c7')
-
-    title_html = f"{name} ({code}) | 현재가: {int(closes[-1]):,}원 | {score_str}"
-    ax1.set_title(title_html, fontsize=16, fontweight='bold', fontproperties=FONT_NAME, pad=15)
-    ax1.grid(True, which='major', axis='both', linestyle='--', color='#bdc3c7', alpha=0.5)
-    ax1.tick_params(axis='y', labelright=True)
-    ax1.legend(loc='upper left', prop={'family':FONT_NAME, 'size':9})
+    for idx, row in df.iterrows():
+        color = 'red' if row['close'] >= row['open'] else 'blue'
+        ax1.vlines(idx, row['low'], row['high'], color=color, lw=1)
+        ax1.vlines(idx, row['open'], row['close'], color=color, lw=4)
+        
+    ax1.set_title(f"{info['name']} ({ticker}) - {info['signal']}", fontsize=14)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     plt.setp(ax1.get_xticklabels(), visible=False)
+    
+    # RSI Chart
+    ax2.plot(dates, df['RSI'], color='orange', label='RSI')
+    ax2.axhline(30, color='blue', linestyle='--')
+    ax2.axhline(70, color='red', linestyle='--')
+    ax2.fill_between(dates, 30, 70, color='gray', alpha=0.1)
+    ax2.set_ylabel('RSI')
+    ax2.grid(True, alpha=0.3)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+    
     return fig
 
-# ---------------------------------------------------------
-# 3. 메인 앱
-# ---------------------------------------------------------
+# ========================================
+# [MAIN]
+# ========================================
 def main():
-    if 'results' not in st.session_state: st.session_state.results = None
-    if 'page' not in st.session_state: st.session_state.page = 1
-    if 'selected_stock' not in st.session_state: st.session_state.selected_stock = None
-    if 'split_lv' not in st.session_state: st.session_state.split_lv = 1
+    st.markdown("""
+        <div class="info-box">
+            <h2>📈 하이브리드 농사매매 V11.0 (Cloud)</h2>
+            <p>코인(Upbit) + 주식(KR Stock) 통합 분석 시스템</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-    st.title("🚜 QUANT FARMING V9.96 (Emergency Mode)") 
-    st.markdown("**강력한 보안 패치 적용** | 비상 모드 탑재")
-    st.divider()
-
-    # UI 패널
-    col_opt1, col_opt2 = st.columns(2)
-    with col_opt1:
-        st.write("📋 **전략 선택**")
-        mode = st.radio("전략", ["농사 A (파종선 2% 맥점)", "농사 B (구름대 맥점)"], horizontal=True, label_visibility="collapsed")
-    with col_opt2:
-        st.write("🏢 **시장 선택**")
-        mkt_opt = st.radio("시장", ["전체", "KOSPI", "KOSDAQ"], horizontal=True, label_visibility="collapsed")
-    
-    st.markdown("---")
-
-    col_price1, col_price2, col_stop, col_run = st.columns([1, 1, 0.4, 0.8])
-    with col_price1:
-        min_p = st.number_input("📉 최소가 (원)", value=1000, min_value=0, step=100)
-    with col_price2:
-        max_p = st.number_input("📈 최대가 (원)", value=1000000, min_value=0, step=1000)
-    
-    # 🛑 정지 버튼
-    with col_stop:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        if st.button("🛑 정지", use_container_width=True):
-            st.rerun()
-
-    # 🚀 검색 버튼
-    with col_run:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) 
-        run_btn = st.button("🚀 검색 시작", type="primary", use_container_width=True)
-
-    if run_btn:
-        st.session_state.page = 1
-        st.session_state.selected_stock = None
-        st_mode = 'N1' if "농사 A" in mode else 'N2'
+    with st.sidebar:
+        st.header("🔍 검색 옵션")
         
-        status_text = st.empty()
-        progress_bar = st.progress(0)
+        market_select = st.selectbox("시장 선택", ["코인 (Upbit)", "주식 (KOSPI/KOSDAQ)"])
+        show_all = st.checkbox("조건 상관없이 모든 종목 보기", value=True)
         
-        status_text.info("📡 KRX 데이터 서버 보안 우회 접속 중...")
-        
-        try:
-            stocks = load_stock_listing(mkt_opt)
-            
-            # [수정] KRX 차단 시에도 stocks는 비상 데이터로 채워지므로 None이 아님
-            if stocks is None or stocks.empty:
-                st.error("❌ 데이터 로드 실패. 잠시 후 다시 시도해주세요.")
-            else:
-                stocks = stocks[~stocks['Name'].str.contains('스팩|ETF|ETN|리츠|우B')]
-                if 'Close' in stocks.columns:
-                    stocks['Close'] = pd.to_numeric(stocks['Close'].astype(str).str.replace(',', ''), errors='coerce')
-                    # 비상 모드일 땐 가격 필터링 완화 (정보가 없을 수 있으므로)
-                    stocks = stocks.dropna(subset=['Close'])
-                
-                target_list = stocks.to_dict('records')
-                total_cnt = len(target_list)
-                
-                status_text.info(f"🔍 총 {total_cnt}개 종목 분석 시작!")
-                results = []
-                
-                done_cnt = 0
-                
-                with ThreadPoolExecutor(max_workers=10) as exe:
-                    futures = {exe.submit(analyze_nongsa, r, st_mode): r for r in target_list}
-                    
-                    for f in as_completed(futures):
-                        res = f.result()
-                        if res: results.append(res)
-                        
-                        done_cnt += 1
-                        if done_cnt % 20 == 0 or done_cnt == total_cnt:
-                            percent = int((done_cnt / total_cnt) * 100)
-                            progress_bar.progress(percent / 100)
-                            status_text.markdown(f"**분석 중... ({done_cnt} / {total_cnt}) — {percent}% 완료**")
+        st.markdown("---")
+        if "주식" in market_select:
+            stock_scope = st.radio("주식 범위", ["KOSPI 상위 50", "KOSDAQ 상위 50", "주요 섹터 통합"])
 
-                progress_bar.empty()
-                status_text.success(f"✅ 분석 완료! 총 {len(results)}개 발견")
-                
-                if results:
-                    st.session_state.results = pd.DataFrame(results).sort_values('Change', ascending=False)
+        if st.button("🚀 데이터 분석 시작", type="primary"):
+            st.session_state['run'] = True
+            st.session_state['market'] = "COIN" if "코인" in market_select else "STOCK"
+            st.session_state['stock_scope'] = stock_scope if "주식" in market_select else None
+            st.session_state['show_all'] = show_all
+
+    if st.session_state.get('run'):
+        status = st.empty()
+        bar = st.progress(0)
+        
+        results = []
+        target_list = []
+        
+        status.info("목록 가져오는 중...")
+        if st.session_state['market'] == "COIN":
+            tickers = pyupbit.get_tickers(fiat="KRW")
+            target_list = [(t, t.replace("KRW-", "")) for t in tickers]
+        else:
+            scope = st.session_state['stock_scope']
+            try:
+                if "KOSPI" in scope:
+                    df_krx = fdr.StockListing('KOSPI')
+                    target_list = [(row['Code'], row['Name']) for i, row in df_krx.head(50).iterrows()]
+                elif "KOSDAQ" in scope:
+                    df_krx = fdr.StockListing('KOSDAQ')
+                    target_list = [(row['Code'], row['Name']) for i, row in df_krx.head(50).iterrows()]
                 else:
-                    st.session_state.results = pd.DataFrame()
-                    st.warning("조건에 맞는 종목이 없습니다.")
+                    df_k = fdr.StockListing('KOSPI').head(50)
+                    df_q = fdr.StockListing('KOSDAQ').head(50)
+                    target_list = [(row['Code'], row['Name']) for i, row in df_k.iterrows()] + \
+                                  [(row['Code'], row['Name']) for i, row in df_q.iterrows()]
+            except:
+                st.error("주식 목록을 불러오는데 실패했습니다.")
+                target_list = []
 
-        except Exception as e:
-            st.error(f"🚨 오류 발생: {e}")
-
-    # 결과 및 차트 표시
-    if st.session_state.results is not None and not st.session_state.results.empty:
-        df = st.session_state.results
+        status.info(f"총 {len(target_list)}개 종목 분석 시작... (클라우드 환경 최적화)")
         
-        ec1, ec2 = st.columns([1, 4])
-        with ec1:
-            csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 엑셀 저장", csv, "farming_list.csv", "text/csv")
-        with ec2:
-            code_list = ";".join(df['Code'].astype(str).tolist())
-            with st.expander("📋 종목코드 복사"):
-                st.code(code_list, language=None)
-
-        items_per_page = 5
-        total_pages = math.ceil(len(df) / items_per_page)
-        start_idx = (st.session_state.page - 1) * items_per_page
-        df_page = df.iloc[start_idx : start_idx + items_per_page]
-
-        st.markdown("<div id='list_top'></div>", unsafe_allow_html=True)
-        st.markdown(f"### 📋 검색 결과 (Page {st.session_state.page}/{total_pages})")
-
-        for idx, row in df_page.iterrows():
-            with st.container():
-                c_1, c_2, c_3, c_4, c_5, c_6 = st.columns([1.5, 1, 2, 1, 1.5, 1])
-                c_1.markdown(f"**{row['Name']}** <span style='color:gray; font-size:0.8em;'>{row['Code']}</span>", unsafe_allow_html=True)
-                c_2.write(f"{row['Market']}")
-                c_3.markdown(f"<span style='color:red'>{row['Note']}</span>", unsafe_allow_html=True)
-                c_4.write(f"{row['Close']:,}원")
-                c_5.write(f"기준: {row['Support']:,}원")
+        # 클라우드는 CPU가 약할 수 있으므로 worker 수 조절
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(analyze_ticker, t[0], t[1], st.session_state['market'], st.session_state['show_all']): t for t in target_list}
+            
+            completed = 0
+            for future in as_completed(futures):
+                res = future.result()
+                if res: results.append(res)
+                completed += 1
+                bar.progress(completed / len(target_list))
                 
-                if c_6.button("📊 차트", key=f"btn_{row['Code']}"):
-                    st.session_state.selected_stock = row['Code']
-
-                st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
-
-        col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns([1, 1, 2, 1, 1])
-        def change_page(p): st.session_state.page = p
+        bar.empty()
         
-        with col_p1: 
-            if st.session_state.page > 1: st.button("⏪ 맨앞", on_click=change_page, args=(1,))
-        with col_p2: 
-            if st.session_state.page > 1: st.button("◀ 이전", on_click=change_page, args=(st.session_state.page-1,))
-        with col_p4: 
-            if st.session_state.page < total_pages: st.button("다음 ▶", on_click=change_page, args=(st.session_state.page+1,))
-        with col_p5: 
-            if st.session_state.page < total_pages: st.button("맨뒤 ⏩", on_click=change_page, args=(total_pages,))
+        if results:
+            results.sort(key=lambda x: x['score'], reverse=True)
+            st.session_state['data'] = results
+            status.success(f"분석 완료! {len(results)}개 종목 표시")
+        else:
+            status.warning("결과가 없습니다.")
+        
+        st.session_state['run'] = False
 
-        if st.session_state.selected_stock:
-            sel_row = df[df['Code'] == st.session_state.selected_stock].iloc[0]
-            st.markdown(f"### 📊 정밀 분석: {sel_row['Name']}")
+    if st.session_state.get('data'):
+        data = st.session_state['data']
+        
+        df_show = pd.DataFrame(data)
+        df_show = df_show[['name', 'price', 'change', 'signal', 'score', 'rsi', 'volume_money', 'code']]
+        df_show.columns = ['종목명', '현재가', '등락률', '신호상태', '점수', 'RSI', '거래대금(백만)', '코드']
+        
+        df_show['등락률'] = df_show['등락률'].apply(lambda x: f"{x:+.2f}%")
+        df_show['현재가'] = df_show['현재가'].apply(lambda x: f"{x:,.0f}")
+        
+        c1, c2 = st.columns([1.2, 1])
+        
+        with c1:
+            st.subheader("📋 전체 종목 리스트")
+            def highlight_signal(row):
+                if "관망" not in row['신호상태']:
+                    return ['background-color: #1e3c72'] * len(row)
+                return [''] * len(row)
             
-            chart_col1, chart_col2 = st.columns([1, 2.5])
+            st.dataframe(df_show.style.apply(highlight_signal, axis=1), height=600, use_container_width=True)
             
-            with chart_col1:
-                st.info(f"**맥점(기준): {sel_row['Support']:,}원**")
+        with c2:
+            st.subheader("📊 차트 상세분석")
+            selected_name = st.selectbox("종목 선택", [d['name'] for d in data])
+            
+            if selected_name:
+                item = next(d for d in data if d['name'] == selected_name)
                 
-                st.write("🔧 **분할 파종 설정**")
-                cols_lv = st.columns(4)
-                if cols_lv[0].button("1차"): st.session_state.split_lv = 1
-                if cols_lv[1].button("2차"): st.session_state.split_lv = 2
-                if cols_lv[2].button("3차"): st.session_state.split_lv = 3
-                if cols_lv[3].button("4차"): st.session_state.split_lv = 4
+                m1, m2, m3 = st.columns(3)
+                m1.metric("현재가", f"{item['price']:,}원", f"{item['change']:+.2f}%")
+                m2.metric("매매신호", item['signal'])
+                m3.metric("점수", f"{item['score']}점")
                 
-                base_price = st.number_input("기준가", value=int(sel_row['Support']), step=10)
-                
-                scenario_lines = []
-                colors = ['red', '#ff9800', '#ff9800', '#ff9800']
-                share_plan = ""
-                
-                for i in range(1, st.session_state.split_lv + 1):
-                    p = int(base_price * (1 - (i-1)*0.05))
-                    label = f"{i}차(맥점)" if i==1 else f"{i}차"
-                    scenario_lines.append((label, p, colors[i-1]))
-                    share_plan += f"\n👉 {label}: {p:,}원"
-
-                share_txt = f"[🚜 농사매매]\n{sel_row['Name']}({sel_row['Code']})\n현재: {sel_row['Close']:,}원\n타점: {sel_row['Note']}\n기준: {sel_row['Support']:,}원\n{share_plan if st.session_state.split_lv > 1 else ''}"
-                st.code(share_txt, language="text")
-                
-                st.markdown("<a href='#list_top'><button style='width:100%; padding:10px; background:#f0f2f6; border:1px solid #ccc; border-radius:5px; font-weight:bold; cursor:pointer;'>⬆️ 리스트로 이동</button></a>", unsafe_allow_html=True)
-
-            with chart_col2:
-                fig = create_chart_figure(sel_row['Code'], sel_row['Name'], sel_row['Note'], scenario_lines)
-                if fig: st.pyplot(fig)
+                fig = draw_chart(item['code'], item['market'], item)
+                if fig:
+                    st.pyplot(fig)
+                    
+                st.info(f"💡 팁: 점수가 높을수록 유리한 위치입니다. (RSI: {item['rsi']})")
 
 if __name__ == '__main__':
     main()
