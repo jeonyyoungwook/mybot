@@ -1,124 +1,138 @@
-import os
-import time
-import urllib.request
-
-# 1. 설치 (화면에 로그가 많이 뜰 수 있습니다)
-print("🚀 프로그램 설치 중... (약 1~2분 소요)")
-os.system("pip install -q streamlit pyupbit pandas pyngrok")
-os.system("npm install -g localtunnel")
-
-# 2. 봇 코드 파일 생성 (app.py)
-bot_code = """
 import streamlit as st
 import pyupbit
 import pandas as pd
 import time
+import datetime
 
-# 페이지 설정
-st.set_page_config(page_title="코랩용 단타봇", layout="wide")
+# 1. 페이지 기본 설정
+st.set_page_config(page_title="AI 자동매매 봇", layout="wide")
 
-# 세션 상태 초기화
-if 'analyzed' not in st.session_state: st.session_state['analyzed'] = False
-if 'target_ticker' not in st.session_state: st.session_state['target_ticker'] = ""
+# 2. 스타일 설정 (다크모드 & 로그창)
+st.markdown("""
+    <style>
+        .stButton>button { height: 50px; font-weight: bold; border-radius: 10px; }
+        .log-box { 
+            background-color: #1e1e1e; color: #00ff00; 
+            padding: 10px; border-radius: 5px; font-family: monospace; 
+            height: 200px; overflow-y: scroll;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-st.title("💎 구글 코랩용 AI 단타 봇")
-st.markdown("---")
+# 3. 상태 변수 초기화
+if 'is_running' not in st.session_state: st.session_state['is_running'] = False
+if 'logs' not in st.session_state: st.session_state['logs'] = []
 
-# 사이드바: 로그인
+# 4. 로그 함수
+def log(msg):
+    now = datetime.datetime.now().strftime("%H:%M:%S")
+    st.session_state['logs'].append(f"[{now}] {msg}")
+    # 로그가 너무 길어지면 앞부분 삭제
+    if len(st.session_state['logs']) > 20:
+        st.session_state['logs'].pop(0)
+
+# 5. RSI 계산 함수
+def get_rsi(ticker):
+    try:
+        df = pyupbit.get_ohlcv(ticker, interval="minute15", count=200) # 15분봉 기준
+        if df is None: return 0
+        delta = df['close'].diff()
+        up = delta.clip(lower=0)
+        down = -1 * delta.clip(upper=0)
+        ema_up = up.ewm(com=13, adjust=False).mean()
+        ema_down = down.ewm(com=13, adjust=False).mean()
+        rs = ema_up / ema_down
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.iloc[-1]
+    except:
+        return 0
+
+# --- 화면 구성 ---
+st.title("🤖 24시간 AI 자동매매 (Auto Bot)")
+
+# [사이드바] 설정 영역
 with st.sidebar:
-    st.header("🔑 로그인 설정")
-    st.info("주의: IP 미지정 API 키를 사용하세요.")
-    access_key = st.text_input("Access Key", type="password")
-    secret_key = st.text_input("Secret Key", type="password")
+    st.header("⚙️ 설정")
+    access = st.text_input("Access Key", type="password")
+    secret = st.text_input("Secret Key", type="password")
+    target_coin = st.selectbox("매매할 코인", ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-DOGE", "KRW-SOL"])
     
-    if access_key and secret_key:
-        try:
-            upbit = pyupbit.Upbit(access_key, secret_key)
-            krw = upbit.get_balance("KRW")
-            if krw is not None:
-                st.success(f"✅ 로그인 성공! 잔고: {krw:,.0f} 원")
-            else:
-                st.error("🚨 잔고 조회 실패 (IP 설정을 확인하세요)")
-        except Exception as e:
-            st.error(f"로그인 에러: {e}")
-
-# 메인: 코인 선택
-st.subheader("🔍 분석할 코인 선택")
-try:
-    tickers = pyupbit.get_tickers(fiat="KRW")
-except:
-    tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
-
-col1, col2 = st.columns([3, 1])
-with col1:
-    selected_ticker = st.selectbox("코인 목록", tickers)
-with col2:
-    if st.button("📊 분석 시작", use_container_width=True):
-        st.session_state['analyzed'] = True
-        st.session_state['target_ticker'] = selected_ticker
-
-# 분석 결과 화면
-if st.session_state['analyzed']:
-    ticker = st.session_state['target_ticker']
     st.markdown("---")
+    st.subheader("매매 전략 (RSI)")
+    buy_rsi = st.slider("매수 기준 (RSI 낮을 때)", 20, 40, 30)
+    sell_rsi = st.slider("매도 기준 (RSI 높을 때)", 60, 80, 70)
+    st.info("💡 15분봉 기준입니다.")
+
+# [메인] 대시보드
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("📡 실시간 현황")
     
-    with st.spinner(f"{ticker} 분석 중..."):
-        try:
-            df = pyupbit.get_ohlcv(ticker, interval="day", count=10)
-            curr_price = pyupbit.get_current_price(ticker)
-            
-            # 전략: 변동성 돌파
-            noise = 1 - abs(df['open'] - df['close']) / (df['high'] - df['low'])
-            k = noise.tail(5).mean()
-            volatility = (df.iloc[-2]['high'] - df.iloc[-2]['low']) * k
-            target_price = df.iloc[-1]['open'] + volatility
-            
-            # 화면 표시
-            c1, c2, c3 = st.columns(3)
-            c1.metric("현재가", f"{curr_price:,.0f} 원")
-            c2.metric("목표 매수가", f"{target_price:,.0f} 원")
-            
-            # 차트
-            st.line_chart(df['close'].tail(20))
-            
-            # 매매 신호
-            if curr_price >= target_price:
-                st.success("🚀 **매수 신호 발생!** (현재가가 목표가를 넘었습니다)")
-                
-                # 매수 로직
-                st.write("▼ 아래 버튼을 누르면 잔고의 50%만큼 시장가 매수합니다.")
-                if st.button("💸 매수 실행 (시장가)"):
-                    if access_key and secret_key:
-                        upbit = pyupbit.Upbit(access_key, secret_key)
-                        krw = upbit.get_balance("KRW")
-                        if krw and krw > 5000:
-                            # 50% 매수
-                            buy_amount = krw * 0.5
-                            upbit.buy_market_order(ticker, buy_amount)
-                            st.toast(f"✅ 주문 완료! 약 {buy_amount:,.0f}원 매수됨.")
-                            st.success("주문이 전송되었습니다.")
-                        else:
-                            st.warning("잔액이 부족하거나(5천원 미만) 로그인이 필요합니다.")
-                    else:
-                        st.error("먼저 왼쪽 사이드바에서 API 키를 입력하세요.")
+    # 자동매매 시작/중지 버튼
+    if st.session_state['is_running']:
+        if st.button("⛔ 자동매매 중지", type="primary"):
+            st.session_state['is_running'] = False
+            log("사용자에 의해 중지됨.")
+            st.experimental_rerun()
+    else:
+        if st.button("▶️ 자동매매 시작"):
+            if access and secret:
+                st.session_state['is_running'] = True
+                log("자동매매 시작! 시세 감시 중...")
+                st.experimental_rerun()
             else:
-                st.info(f"💤 관망 중... (목표가까지 {target_price - curr_price:,.0f}원 남음)")
-                
+                st.error("키를 먼저 입력하세요.")
+
+    # 현재 상태 표시
+    if st.session_state['is_running']:
+        st.success("✅ **작동 중... (브라우저를 닫지 마세요)**")
+        
+        # --- [핵심 로직] ---
+        try:
+            upbit = pyupbit.Upbit(access, secret)
+            cur_price = pyupbit.get_current_price(target_coin)
+            rsi = get_rsi(target_coin)
+            krw = upbit.get_balance("KRW")
+            coin_bal = upbit.get_balance(target_coin)
+            coin_val = coin_bal * cur_price
+
+            # 화면 표시
+            m1, m2, m3 = st.columns(3)
+            m1.metric("현재가", f"{cur_price:,.0f}원")
+            m2.metric("RSI 지표", f"{rsi:.1f}")
+            m3.metric("보유 상태", f"{'보유중' if coin_val > 5000 else '대기중'}")
+
+            # 매수 로직
+            if coin_val < 5000 and rsi <= buy_rsi:
+                if krw >= 5000:
+                    upbit.buy_market_order(target_coin, krw * 0.99) # 전량 매수
+                    log(f"⚡ [매수] RSI {rsi:.1f} 포착 -> 매수 체결")
+                else:
+                    log("잔액 부족으로 매수 실패")
+
+            # 매도 로직
+            elif coin_val > 5000 and rsi >= sell_rsi:
+                upbit.sell_market_order(target_coin, coin_bal) # 전량 매도
+                log(f"💰 [매도] RSI {rsi:.1f} 도달 -> 익절/손절")
+            
+            else:
+                # 아무 일도 없으면 로그만 가끔 찍기 (너무 자주 찍히지 않게)
+                pass
+
         except Exception as e:
-            st.error(f"데이터 분석 실패: {e}")
-"""
+            log(f"에러 발생: {e}")
+            st.error("API 키를 확인하거나 일시적인 오류입니다.")
 
-# 파일 저장
-with open("app.py", "w", encoding='utf-8') as f:
-    f.write(bot_code)
+        # 🔄 자동 새로고침 (이게 있어야 반복됨)
+        time.sleep(3) # 3초마다 체크
+        st.experimental_rerun()
 
-print("✅ 설치 및 파일 생성 완료!")
-print("="*60)
-print("🔑 아래 IP 숫자를 복사하세요 (Password):")
-# 외부 IP 확인
-print(urllib.request.urlopen('https://ipv4.icanhazip.com').read().decode('utf8').strip())
-print("="*60)
-print("🌐 잠시 후 아래 'your url is...' 옆의 링크를 클릭하세요.")
+    else:
+        st.warning("💤 봇이 꺼져 있습니다. '시작' 버튼을 누르세요.")
 
-# 3. 실행 (백그라운드)
-os.system("streamlit run app.py & npx localtunnel --port 8501")
+# [로그창]
+with col2:
+    st.subheader("📜 거래 로그")
+    log_text = "<br>".join(reversed(st.session_state['logs']))
+    st.markdown(f"<div class='log-box'>{log_text}</div>", unsafe_allow_html=True)
