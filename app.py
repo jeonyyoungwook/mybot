@@ -1,63 +1,51 @@
 import streamlit as st
+import urllib.parse
 
-# 페이지 설정
-st.set_page_config(page_title="GenSpark 시크릿 접속기", layout="centered")
-
-# 스타일 설정 (버튼 예쁘게 꾸미기)
-st.markdown("""
-    <style>
-    .big-button {
-        display: block;
-        width: 100%;
-        padding: 20px;
-        font-size: 24px;
-        font-weight: bold;
-        color: white !important;
-        background-color: #FF4B4B;
-        text-align: center;
-        text-decoration: none;
-        border-radius: 12px;
-        margin-top: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: all 0.3s;
-    }
-    .big-button:hover {
-        background-color: #FF2E2E;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.2);
-    }
-    .info-box {
-        background-color: #f0f2f6;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 5px solid #FF4B4B;
-        font-size: 16px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# 페이지 설정 (모바일 화면에 맞춤)
+st.set_page_config(page_title="GenSpark 접속기", layout="centered")
 
 # 제목
-st.title("🕵️‍♂️ GenSpark 시크릿 접속기")
+st.title("🚀 GenSpark 빠른 접속")
+st.write("질문을 입력하고 버튼을 누르면 바로 이동합니다!")
 
-# 안내 문구
+# 1. 질문 입력창
+query = st.text_input(
+    "무엇을 검색할까요?", 
+    placeholder="예: 오늘 서울 날씨 어때?"
+)
+
+# 2. 버튼 생성 로직
+if query:
+    # 질문이 있으면 -> 검색 결과 페이지로 바로 이동하는 링크 생성
+    # 한글 검색어를 URL용 문자로 변환 (인코딩)
+    encoded_query = urllib.parse.quote(query)
+    search_url = f"https://www.genspark.ai/search?query={encoded_query}"
+    
+    st.info("👇 아래 버튼을 누르면 검색 결과가 새 창으로 열립니다.")
+    
+    # 빨간색 큰 버튼 (질문 포함)
+    st.link_button(
+        label="🔍 검색 결과 바로 보기 (클릭)", 
+        url=search_url,
+        type="primary", # 빨간색 강조
+        use_container_width=True # 모바일에서 버튼 꽉 차게
+    )
+
+else:
+    # 질문이 없으면 -> 그냥 홈페이지로 가는 버튼 보여줌
+    st.info("👇 질문을 입력하면 바로 검색할 수 있습니다.")
+    
+    # 회색 기본 버튼 (홈페이지 이동)
+    st.link_button(
+        label="🏠 GenSpark 홈페이지 열기", 
+        url="https://www.genspark.ai/",
+        use_container_width=True
+    )
+
+st.markdown("---")
 st.markdown("""
-<div class="info-box">
-    <b>💡 사용 방법 (필독!)</b><br><br>
-    웹 보안상 자동으로 '시크릿 모드'를 켜는 것은 불가능합니다.<br>
-    대신 아래 <b>빨간 버튼</b>을 이용해서 한 번에 들어갈 수 있습니다.<br><br>
-    1. 아래 빨간 버튼에 <b>마우스 오른쪽 클릭</b>을 하세요.<br>
-    2. <b>[시크릿 창에서 링크 열기]</b>를 클릭하세요.<br>
-       (크롬: 시크릿 창 / 엣지: InPrivate 창)
-</div>
-""", unsafe_allow_html=True)
-
-# 젠스파크 바로가기 버튼 (우클릭 유도)
-st.markdown("""
-    <a href="https://www.genspark.ai/" class="big-button" target="_blank">
-        🚀 GenSpark 접속 버튼 (여기서 우클릭!)
-    </a>
-""", unsafe_allow_html=True)
-
-st.write("")
-st.write("")
-st.caption("※ 이 페이지를 즐겨찾기 해두시면 언제든 편하게 접속할 수 있습니다.")
+### 💡 모바일 사용 팁
+**시크릿 모드(기록 안 남기기)로 열고 싶다면?**
+1. 위 버튼을 **꾹~ 길게 누르세요.**
+2. 메뉴가 뜨면 **'시크릿 탭에서 열기'** 또는 **'새 비공개 탭에서 열기'**를 선택하세요.
+""")
