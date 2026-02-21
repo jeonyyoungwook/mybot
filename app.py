@@ -1,60 +1,86 @@
 import streamlit as st
-import urllib.parse
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="GenSpark 마법 접속기", page_icon="🪄", layout="centered")
+st.set_page_config(page_title="GenSpark 초간단 해제기", page_icon="⚡", layout="centered")
 
-st.title("🪄 GenSpark 로그인 제거기")
-st.markdown("확장 프로그램 없이, **즐겨찾기(북마크)**를 이용해 로그인 창을 뚫는 방법입니다.")
-
-st.divider()
-
-# --- 1단계: 검색 기능 ---
-st.subheader("Step 1. 검색하고 접속하기")
-query = st.text_input("질문 입력", placeholder="예: 최신 AI 트렌드 알려줘")
-
-if query:
-    encoded_query = urllib.parse.quote(query)
-    target_url = f"https://www.genspark.ai/search?query={encoded_query}"
-else:
-    target_url = "https://www.genspark.ai/"
-
-st.link_button("🚀 GenSpark 접속 (새창)", target_url, type="primary", use_container_width=True)
+st.title("⚡ GenSpark 로그인 해제 (초간단)")
+st.caption("복잡한 설정? 다 필요 없습니다. 마우스로 끌어다 놓으세요!")
 
 st.divider()
 
-# --- 2단계: 북마크 만들기 (핵심) ---
-st.subheader("Step 2. '로그인 제거' 버튼 만들기")
-st.info("이 설정은 딱 한 번만 하면 평생 쓸 수 있습니다!")
+# ------------------------------------------------------------
+# 1단계: 준비물 (즐겨찾기 바 켜기)
+# ------------------------------------------------------------
+st.subheader("1단계: 키보드에서 [Ctrl] + [Shift] + [B] 누르기")
+st.info("브라우저 상단에 '즐겨찾기 바(북마크 바)'가 나타나야 합니다. 이미 있으면 패스!")
+
+# ------------------------------------------------------------
+# 2단계: 드래그 앤 드롭 버튼 (핵심 기술)
+# ------------------------------------------------------------
+st.subheader("2단계: 아래 파란 버튼을 위로 끌어다 놓으세요")
+
+# 자바스크립트 코드 (로그인 창 삭제 + 스크롤 풀기)
+js_code = """javascript:(function(){
+    var m = document.querySelectorAll('div[class*="AuthModal"], div[class*="backdrop"]');
+    if(m.length > 0){
+        m.forEach(e => e.remove());
+        document.body.style.overflow = 'auto';
+    } else {
+        alert('삭제할 로그인 창이 없습니다.');
+    }
+})();"""
+
+# HTML/CSS로 '드래그 전용 버튼' 만들기
+# onclick="return false;"를 넣어서 클릭해도 아무 반응 없게 만듦 (오직 드래그만 가능하도록)
+html_content = f"""
+<style>
+    .drag-btn {{
+        display: block;
+        width: 100%;
+        background-color: #3b82f6; /* 밝은 파란색 */
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        padding: 20px;
+        border-radius: 12px;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        cursor: grab; /* 마우스 커서를 손모양으로 */
+        border: 2px dashed #ffffff;
+    }}
+    .drag-btn:active {{
+        cursor: grabbing;
+        background-color: #2563eb;
+    }}
+    .instruction {{
+        text-align: center;
+        margin-top: 10px;
+        color: #666;
+        font-size: 14px;
+    }}
+</style>
+
+<a href='{js_code}' class="drag-btn" onclick="return false;">
+    🖱️ 이 버튼을 잡고, 즐겨찾기 바에 놓으세요!
+</a>
+<div class="instruction">⚠️ 클릭하지 마세요! <b>마우스 왼쪽 버튼을 꾹 누른 채로</b> 위로 끌고 가세요.</div>
+"""
+
+components.html(html_content, height=120)
+
+st.divider()
+
+# ------------------------------------------------------------
+# 3단계: 테스트 및 사용
+# ------------------------------------------------------------
+st.subheader("3단계: 이제 사용해볼까요?")
 
 st.markdown("""
-**👇 아래 순서대로 따라하세요:**
-
-1. 브라우저 상단 주소창 아래 빈 곳에 마우스를 대고 **우클릭** 하세요.
-2. **[페이지 추가]** 또는 **[바로가기 추가]**를 누르세요.
-3. **이름** 칸에는: `로그인 제거` 라고 쓰세요.
-4. **URL(주소)** 칸에는: 아래 **검은 박스 안의 코드**를 복사해서 붙여넣으세요.
+1. 아래 버튼을 눌러 **GenSpark**에 접속하세요.
+2. 검색하다가 **로그인 창**이 뜨면?
+3. 방금 즐겨찾기 바에 가져다 놓은 **[🖱️ 이 버튼을 잡고...]** 버튼을 누르세요.
+4. 로그인 창이 **펑!** 하고 사라집니다.
 """)
 
-# 자바스크립트 코드 (한 줄로 압축)
-js_code = """javascript:(function(){const m=document.querySelectorAll('div[class*="AuthModal"],div[class*="backdrop"]');if(m.length>0){m.forEach(e=>e.remove());document.body.style.overflow='auto';}else{alert('로그인 창이 안 보입니다!');}})();"""
-
-# 코드 복사하기 쉽게 보여주기
-st.code(js_code, language="javascript")
-st.caption("▲ 위 코드를 복사해서 북마크의 'URL' 또는 '주소' 칸에 넣으세요.")
-
-st.divider()
-
-# --- 3단계: 사용법 ---
-st.subheader("Step 3. 사용하는 법")
-st.success("""
-1. GenSpark에서 검색하다가 **로그인 창**이 화면을 가리면?
-2. 방금 만든 **[로그인 제거] 북마크**를 클릭하세요.
-3. 로그인 창이 즉시 사라집니다! 🎉
-""")
-
-with st.expander("동작 원리가 뭔가요?"):
-    st.write("""
-    이 코드는 '북마크릿(Bookmarklet)'이라고 부릅니다. 
-    북마크를 누르는 순간, 페이지에 있는 '로그인 팝업(AuthModal)' 요소를 찾아서 
-    강제로 삭제(remove)하는 자바스크립트 명령을 내리는 원리입니다.
-    """)
+st.link_button("🚀 GenSpark 접속해서 테스트하기", "https://www.genspark.ai/", type="primary", use_container_width=True)
