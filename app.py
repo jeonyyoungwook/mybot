@@ -1,77 +1,85 @@
 import streamlit as st
 
-# 1. 페이지 설정
-st.set_page_config(page_title="최종 해결", page_icon="🔓", layout="centered")
+st.set_page_config(page_title="최종 해결", page_icon="🚨", layout="centered")
 
-st.title("🔓 젠스파크 먹통 해결사")
-st.success("이제 검색 버튼이 안 눌리는 문제까지 해결됩니다!")
-st.info("👇 아래 검은 박스에 있는 코드를 복사해서 즐겨찾기를 수정하세요.")
+st.title("🚨 반응이 없을 때 해결법")
+st.error("버튼을 눌러도 아무 반응이 없다면, '주소'가 잘못 들어간 겁니다!")
 
 st.divider()
 
 # ------------------------------------------------------------------
-# [핵심] 1단계: 복사할 코드 (검색창 잠금 해제 기능 포함)
+# 1단계: 코드 복사 (알림창 기능 추가)
 # ------------------------------------------------------------------
 st.subheader("1단계: 아래 코드를 복사하세요")
-st.caption("오른쪽 위에 있는 📄(복사) 아이콘을 누르면 한 번에 복사됩니다.")
+st.caption("👇 오른쪽 위 📄(복사) 버튼 클릭")
 
-# 이 코드는 로그인 창 삭제 + 얼어붙은 검색 버튼 녹이기 기능이 들어있습니다.
-final_js_code = """javascript:(function(){
-    /* 1. 화면 가리는 창(로그인/배경) 삭제 */
-    var selectors = [
-        '[role="dialog"]',
-        'div[class*="backdrop"]',
-        'div[class*="overlay"]',
-        'div[id^="headlessui-portal"]',
-        'div[class*="fixed"]'
-    ];
-    selectors.forEach(function(sel) {
-        document.querySelectorAll(sel).forEach(function(el) {
-            /* 'Sign in' 글자가 있거나 화면 전체를 덮는 투명창이면 삭제 */
-            if(el.innerText.includes('Sign in') || el.innerText.includes('Google') || el.clientWidth >= window.innerWidth) {
+# 이 코드는 실행되자마자 알림창을 띄웁니다.
+js_code = """javascript:(function(){
+    /* 1. 작동 확인용 알림 (이게 안 뜨면 주소 등록 잘못된 것) */
+    alert("⚡ 작동 시작! (확인을 누르면 삭제됩니다)");
+
+    /* 2. 화면 가리는 모든 요소(로그인, 배경) 강제 삭제 */
+    var delCount = 0;
+    var elements = document.querySelectorAll('body *');
+    
+    for(var i=0; i<elements.length; i++) {
+        var el = elements[i];
+        var style = window.getComputedStyle(el);
+        
+        // 화면에 고정되어 있고(fixed), 'Sign in' 글자가 있거나 화면 전체를 덮는 요소
+        if(style.position === 'fixed' && style.zIndex > 10) {
+            if(el.innerText.includes('Sign in') || el.innerText.includes('Google') || el.innerText.includes('Apple')) {
                 el.remove();
+                delCount++;
             }
-        });
+            // 투명 배경 삭제
+            else if(el.clientWidth >= window.innerWidth && el.clientHeight >= window.innerHeight) {
+                el.remove();
+                delCount++;
+            }
+        }
+    }
+
+    /* 3. 젠스파크 전용 팝업 삭제 (추가) */
+    var selectors = ['[role="dialog"]', 'div[id^="headlessui"]'];
+    selectors.forEach(function(sel){
+        document.querySelectorAll(sel).forEach(function(e){ e.remove(); delCount++; });
     });
 
-    /* 2. [중요] 먹통된 검색창 & 버튼 강제 활성화 */
-    var frozen = document.querySelectorAll('textarea, input, button, div[role="button"]');
-    frozen.forEach(function(el){
-        el.disabled = false;               /* 사용 금지 해제 */
-        el.readOnly = false;               /* 읽기 전용 해제 */
-        el.style.pointerEvents = 'auto';   /* 마우스 클릭 허용 */
-        el.style.cursor = 'text';          /* 커서 모양 복구 */
-    });
-
-    /* 3. 스크롤 풀기 */
+    /* 4. 스크롤 및 입력창 잠금 해제 */
     document.body.style.overflow = 'auto';
-    document.body.style.position = 'static';
-
-    /* 4. 검색창에 커서 넣고 클릭 신호 보내기 */
-    var searchBox = document.querySelector('textarea');
-    if(searchBox) {
-        searchBox.focus();
-        searchBox.click();
+    var inputs = document.querySelectorAll('textarea, input');
+    inputs.forEach(function(el){
+        el.disabled = false;
+        el.readOnly = false;
+        el.style.pointerEvents = 'auto';
+    });
+    
+    /* 5. 결과 알림 */
+    if(delCount === 0) {
+        alert("⚠️ 삭제할 창을 못 찾았습니다. (이미 지워졌거나 코드가 막힘)");
     }
 })();"""
 
-# 화면에 코드 표시 (복사 버튼 포함)
-st.code(final_js_code, language="javascript")
+st.code(js_code, language="javascript")
 
 st.divider()
 
 # ------------------------------------------------------------------
-# 2단계: 즐겨찾기 수정 방법
+# 2단계: 즐겨찾기 수정 (가장 중요!!!)
 # ------------------------------------------------------------------
-st.subheader("2단계: 즐겨찾기 주소 수정하기")
+st.subheader("2단계: 즐겨찾기 수정 (필독 ⚠️)")
+st.warning("아래 내용을 꼭 확인하세요. 여기가 틀리면 반응이 없습니다.")
+
 st.markdown("""
-1. 브라우저 맨 위에 있는 **즐겨찾기 버튼**에 마우스를 올리세요.
-2. 마우스 **[우클릭]** -> **[수정]**을 누르세요.
-3. **URL (또는 주소)** 칸에 있는 내용을 **전부 지우세요.**
-4. 방금 복사한 코드를 **[붙여넣기]** (Ctrl+V) 하세요.
-5. **[저장]** 누르면 끝!
+1. 브라우저 맨 위 **즐겨찾기 버튼(폭파)**에 마우스를 대고 **[우클릭]** -> **[수정]** 누르세요.
+2. **URL (또는 주소)** 칸에 있는 걸 **싹 다 지우세요.** (한 글자도 남기지 마세요!)
+3. 방금 복사한 코드를 **[붙여넣기]** 하세요.
+4. **🔴 중요:** 붙여넣은 맨 앞에 `javascript:` 라는 글자가 잘 있는지 꼭 확인하세요!
+   *(가끔 크롬이 보안 때문에 이 글자만 쏙 빼고 붙여넣기 할 때가 있습니다)*
+5. **[저장]** 누르세요.
 """)
 
 st.divider()
 
-st.link_button("🚀 젠스파크 접속해서 테스트", "https://www.genspark.ai/", type="primary", use_container_width=True)
+st.success("테스트 방법: 젠스파크에서 버튼을 눌렀을 때 **'⚡ 작동 시작!'** 알림창이 뜨면 성공입니다!")
