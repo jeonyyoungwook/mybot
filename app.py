@@ -12,8 +12,7 @@ st.set_page_config(page_title="GenSpark 시크릿 질문기", layout="wide")
 st.title("🕵️‍♂️ GenSpark 시크릿 질문기")
 st.write("서버 상태에 따라 실행까지 시간이 조금 걸릴 수 있습니다.")
 
-# 1. 입력창 글씨 수정 (4개 국어 반영)
-# 한글 / 영어 / 일본어 / 중국어
+# 1. 입력창 안내 문구
 placeholder_text = "[질문 하는 곳입니다 / Type your question / 質問を入力してください / 请输入您的问题]"
 
 query = st.text_input(
@@ -24,50 +23,50 @@ query = st.text_input(
 if st.button("🚀 질문 실행하기"):
     if query:
         status_area = st.empty()
-        status_area.info("🤖 봇: 보안 벽을 뚫고 접속을 시도합니다...")
+        status_area.info("🤖 봇: 젠스파크에 접속해서 질문을 입력하는 중입니다...")
 
-        # 크롬 옵션 설정 (사람인 척 위장하기 위한 설정)
+        # 크롬 옵션 설정
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # 화면 없이 실행
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--incognito") # 시크릿 모드
+        chrome_options.add_argument("--incognito")
         
-        # 2. 봇 탐지 회피를 위한 강력한 설정 추가
-        # "나 자동화된 로봇 아니야!" 라고 브라우저 속성 숨기기
+        # 봇 탐지 회피 설정
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
-        
-        # 일반 사람의 브라우저 정보(User-Agent)로 위장
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 
         try:
             driver = webdriver.Chrome(options=chrome_options)
             
-            # GenSpark 접속
-            url = f"https://www.genspark.ai/search?query={query}"
-            driver.get(url)
+            # 1. 메인 홈페이지로 이동 (검색 결과 페이지 X)
+            driver.get("https://www.genspark.ai/")
             
-            # 페이지 로딩 및 보안 점검 통과 대기
-            status_area.info("⏳ 페이지 로딩 중... (보안 점검 우회 시도 중)")
-            
-            # 보안 창이 뜰 수 있으므로 넉넉하게 기다림
-            time.sleep(8) 
+            status_area.info("⏳ 홈페이지 도착! 검색창을 찾는 중...")
+            time.sleep(5) # 페이지 로딩 대기
 
-            # 3. 로그인 팝업 등 방해 요소 닫기 시도
+            # 2. 검색창(textarea) 찾아서 입력하기
+            # 화면에 보이는 'Ask anything' 칸을 찾습니다.
             try:
-                webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                search_box = driver.find_element(By.TAG_NAME, "textarea")
+                search_box.click()
                 time.sleep(1)
-            except:
-                pass
+                search_box.send_keys(query) # 질문 입력
+                time.sleep(1)
+                search_box.send_keys(Keys.ENTER) # 엔터 치기
+                
+                status_area.info("📝 질문 입력 완료! 답변을 기다리는 중...")
+            except Exception as e:
+                st.error(f"검색창을 찾지 못했습니다: {e}")
 
-            # 결과 화면이 뜰 때까지 조금 더 대기
-            time.sleep(3)
+            # 3. 답변 생성 대기 (AI가 생각할 시간)
+            time.sleep(10) 
 
-            # 스크린샷 찍기
+            # 4. 스크린샷 찍기
             screenshot = driver.get_screenshot_as_png()
-            st.image(screenshot, caption="결과 화면", use_container_width=True)
+            st.image(screenshot, caption="AI 답변 결과", use_container_width=True)
 
             status_area.success("✅ 완료!")
 
@@ -75,7 +74,6 @@ if st.button("🚀 질문 실행하기"):
             st.error(f"에러가 발생했습니다: {e}")
         
         finally:
-            # 브라우저 종료
             if 'driver' in locals():
                 driver.quit()
     else:
