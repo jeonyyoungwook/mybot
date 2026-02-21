@@ -1,3 +1,2 @@
-%%writefile packages.txt
 chromium
 chromium-driver
