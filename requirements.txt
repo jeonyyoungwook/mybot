@@ -1,10 +1,4 @@
+%%writefile requirements.txt
 streamlit
-pyupbit
-finance-datareader
-pandas
-numpy
-matplotlib
-plotly
-requests
-lxml
-beautifulsoup4
+selenium
+webdriver-manager
