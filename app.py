@@ -2,46 +2,73 @@ import streamlit as st
 import streamlit.components.v1 as components
 import urllib.parse
 
-st.set_page_config(page_title="최종 해결", page_icon="🚑", layout="centered")
+st.set_page_config(page_title="최종 해결", page_icon="🧟‍♂️", layout="centered")
 
-st.title("🚑 로그인 창 강제 삭제")
-st.error("기존 즐겨찾기는 삭제하세요! 안 되는 버튼입니다.")
+st.title("🧟‍♂️ 로그인 창 추적 파괴")
+st.error("기존 버튼은 삭제하세요! '글자'를 보고 찾는 방식입니다.")
 
 st.divider()
 
-st.subheader("👇 아래 파란 버튼을 다시 드래그하세요")
+st.subheader("👇 아래 초록색 버튼을 드래그하세요")
 
 # --------------------------------------------------------------------------------
-# 자바스크립트 로직 (젠스파크 전용 'headlessui' ID 찾기)
+# [로직 설명]
+# ID나 Class 이름은 무시합니다.
+# 화면에 있는 모든 요소를 뒤져서 "Sign in" 또는 "Google" 이라는 글자가 있고,
+# 화면에 고정(fixed)되어 떠있는 창이라면 무조건 삭제합니다.
 # --------------------------------------------------------------------------------
 raw_js_code = """
 (function(){
-    // 1. 작동 확인용 알림 (이게 안 뜨면 즐겨찾기 등록이 잘못된 것)
-    alert("삭제를 시작합니다! (확인 누르면 삭제됨)");
-
     var count = 0;
+    
+    // 1. 모든 div 태그를 다 가져옵니다.
+    var allDivs = document.getElementsByTagName('div');
+    
+    for(var i=0; i<allDivs.length; i++){
+        var el = allDivs[i];
+        
+        // 2. 글자 내용을 확인합니다. (Sign in or sign up)
+        if(el.innerText && (el.innerText.includes('Sign in or sign up') || el.innerText.includes('Continue with Google'))) {
+            
+            // 3. 글자가 발견되면, 그 요소가 화면에 고정된(fixed) 팝업인지 확인합니다.
+            var style = window.getComputedStyle(el);
+            // 팝업이거나, 팝업의 부모 요소라면
+            if(style.position === 'fixed' || style.zIndex > 50) {
+                el.remove(); // 삭제!
+                count++;
+            }
+            // 혹시 모르니 그 부모(껍데기)도 찾아서 지웁니다.
+            var parent = el.closest('[role="dialog"]');
+            if(parent) { parent.remove(); count++; }
+        }
+    }
 
-    // [핵심] 젠스파크는 'headlessui-portal-root'라는 ID를 씁니다. 이걸 찾아서 통째로 날립니다.
-    var roots = document.querySelectorAll('div[id^="headlessui-portal-root"]');
-    roots.forEach(function(r){ r.remove(); count++; });
+    // 4. 배경 어둡게 하는 막(Backdrop) 제거 (화면 전체를 덮는 투명/검은 창)
+    // 이름표 없이, 크기가 화면만큼 큰 fixed 요소를 찾습니다.
+    for(var i=0; i<allDivs.length; i++){
+        var el = allDivs[i];
+        var style = window.getComputedStyle(el);
+        if(style.position === 'fixed' && el.offsetWidth >= window.innerWidth) {
+            // 단, 메뉴바(헤더)는 지우면 안되니까 z-index가 높은것만
+            if(style.zIndex > 10) {
+                el.remove();
+            }
+        }
+    }
 
-    // [보조] 혹시 몰라 'dialog' 역할하는 놈들도 다 날립니다.
-    var dialogs = document.querySelectorAll('[role="dialog"]');
-    dialogs.forEach(function(d){ d.remove(); count++; });
-
-    // [마무리] 스크롤 락 풀기
+    // 5. 스크롤 락 풀기
     document.body.style.overflow = 'auto'; 
-    document.body.style.position = 'static';
 
-    if(count === 0) {
-        alert("⚠️ 삭제할 대상을 못 찾았습니다. 코드가 막힌 것 같습니다.");
+    if(count > 0) {
+        // 성공했으면 조용히 삭제
     } else {
-        console.log("삭제 완료");
+        // 실패했으면 강제로 알림
+        console.log("글자를 못 찾았지만 배경은 지웠을 수 있습니다.");
     }
 })();
 """
 
-# 코드를 URL 형식으로 완벽하게 변환 (오류 방지)
+# 안전하게 URL 변환
 safe_url = "javascript:" + urllib.parse.quote(raw_js_code)
 
 # HTML 버튼
@@ -50,10 +77,10 @@ html_content = f"""
 <html>
 <head>
 <style>
-    .final-btn {{
+    .zombie-btn {{
         display: block;
         width: 100%;
-        background-color: #2563eb; /* 진한 파랑 */
+        background-color: #10b981; /* 초록색 */
         color: white;
         text-align: center;
         padding: 20px 0;
@@ -62,13 +89,13 @@ html_content = f"""
         font-weight: 900;
         font-size: 22px;
         border-radius: 12px;
-        border: 4px solid #ffffff;
+        border: 4px dashed #ffffff;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         cursor: grab;
     }}
-    .final-btn:active {{
+    .zombie-btn:active {{
         cursor: grabbing;
-        background-color: #1d4ed8;
+        background-color: #059669;
     }}
     .desc {{
         text-align: center;
@@ -79,10 +106,10 @@ html_content = f"""
 </style>
 </head>
 <body>
-    <a class="final-btn" onclick="return false;" href="{safe_url}">
-        💉 로그인창 뿌리 뽑기 (드래그)
+    <a class="zombie-btn" onclick="return false;" href="{safe_url}">
+        🧟‍♂️ 로그인창 추적 삭제 (드래그)
     </a>
-    <div class="desc">▲ 기존 버튼은 지우고, 이 파란 버튼을 새로 넣으세요!</div>
+    <div class="desc">▲ 파란 버튼은 지우고, 이 초록 버튼을 넣으세요!</div>
 </body>
 </html>
 """
@@ -90,13 +117,5 @@ html_content = f"""
 components.html(html_content, height=140)
 
 st.divider()
-
-st.info("""
-**[테스트 방법]**
-1. 젠스파크 로그인 창이 뜬 상태에서
-2. 방금 옮긴 **파란색 즐겨찾기 버튼**을 누르세요.
-3. 화면 중앙에 **"삭제를 시작합니다!"** 라는 알림창이 뜰 겁니다.
-4. [확인]을 누르면 로그인 창이 사라집니다.
-""")
 
 st.link_button("🚀 젠스파크 다시 접속", "https://www.genspark.ai/", type="primary", use_container_width=True)
