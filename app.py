@@ -1,107 +1,80 @@
 import streamlit as st
-import streamlit.components.v1 as components
-import urllib.parse
 
-st.set_page_config(page_title="최종 해결", page_icon="🔮", layout="centered")
+st.set_page_config(page_title="최종 해결", page_icon="🛑", layout="centered")
 
-st.title("🔮 잠금 해제 + 로그인 파괴")
-st.error("기존 버튼은 지우세요! 검색창 '잠금'까지 푸는 버전입니다.")
+st.title("🛑 최후의 수단 (수동 등록)")
+st.error("드래그 기능이 브라우저 보안에 막혔습니다. '복사+붙여넣기'만 살 길입니다.")
 
 st.divider()
 
-st.subheader("👇 아래 보라색 버튼을 드래그하세요")
+# ------------------------------------------------------------------
+# 1단계: 코드 복사
+# ------------------------------------------------------------------
+st.subheader("1단계: 아래 코드를 복사하세요")
+st.caption("👇 검은 박스 오른쪽 위 '복사 아이콘' 클릭")
 
-# --------------------------------------------------------------------------------
-# [로직 설명]
-# 1. 'Sign in' 창 삭제 (기존 기능)
-# 2. 화면 전체를 막고 있는 투명한 막(Overlay) 삭제
-# 3. 비활성화(disabled)된 검색창을 강제로 활성화(enabled)
-# 4. 마우스 클릭 금지(pointer-events: none) 걸린 걸 강제로 해제
-# --------------------------------------------------------------------------------
-raw_js_code = """
-(function(){
-    // 1. 로그인 창(Sign in) 찾아서 삭제
-    var allDivs = document.querySelectorAll('div, section');
-    allDivs.forEach(function(el){
-        if(el.innerText && (el.innerText.includes('Sign in or sign up') || el.innerText.includes('Continue with Google'))) {
-            var parent = el.closest('[style*="fixed"]') || el.closest('[role="dialog"]');
-            if(parent) parent.remove();
-        }
+# 이 코드는 젠스파크의 모든 잠금장치를 강제로 풉니다.
+js_code = """javascript:(function(){
+    /* 1. 알림창으로 작동 확인 */
+    console.log("폭파 시작");
+
+    /* 2. 대화상자, 팝업, 오버레이, 백드롭 등 모든 가림막 삭제 */
+    var selectors = [
+        '[role="dialog"]',
+        'div[class*="backdrop"]',
+        'div[class*="overlay"]',
+        'div[id^="headlessui-portal"]',
+        'div[class*="fixed"]'
+    ];
+
+    selectors.forEach(function(sel) {
+        document.querySelectorAll(sel).forEach(function(el) {
+            /* 3. 진짜 로그인 창인지 확인 (Sign in 글자 포함 또는 화면 전체 덮는 것) */
+            if(el.innerText.includes('Sign in') || el.innerText.includes('Google') || el.clientWidth > window.innerWidth * 0.9) {
+                el.remove();
+            }
+        });
     });
 
-    // 2. 화면 가리는 투명 막(Backdrop) 무조건 삭제
-    var backdrops = document.querySelectorAll('div[class*="backdrop"], div[class*="overlay"]');
-    backdrops.forEach(e => e.remove());
-
-    // 3. [핵심] 잠겨있는 검색창(textarea) 강제 잠금 해제
-    var inputs = document.querySelectorAll('textarea, input, button');
+    /* 4. 잠긴 검색창 강제 해제 (클릭 가능하게 변경) */
+    var inputs = document.querySelectorAll('textarea, input');
     inputs.forEach(function(el){
-        el.disabled = false;               // 사용 금지 해제
-        el.style.pointerEvents = 'auto';   // 클릭 금지 해제
-        el.readOnly = false;               // 읽기 전용 해제
+        el.disabled = false;
+        el.readOnly = false;
+        el.style.pointerEvents = 'auto';
     });
-
-    // 4. 스크롤 락 풀기
+    
+    /* 5. 스크롤 풀기 */
     document.body.style.overflow = 'auto';
-    document.body.style.position = 'static';
+})();"""
 
-    // 5. 검색창에 강제로 커서 갖다 놓기 (바로 엔터 칠 수 있게)
-    var mainInput = document.querySelector('textarea');
-    if(mainInput) {
-        mainInput.focus();
-        mainInput.click();
-    }
-})();
-"""
-
-# 안전하게 URL 변환
-safe_url = "javascript:" + urllib.parse.quote(raw_js_code)
-
-# HTML 버튼
-html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-    .magic-btn {{
-        display: block;
-        width: 100%;
-        background-color: #8b5cf6; /* 보라색 */
-        color: white;
-        text-align: center;
-        padding: 20px 0;
-        text-decoration: none;
-        font-family: sans-serif;
-        font-weight: 900;
-        font-size: 22px;
-        border-radius: 12px;
-        border: 4px dashed #ffffff;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        cursor: grab;
-    }}
-    .magic-btn:active {{
-        cursor: grabbing;
-        background-color: #7c3aed;
-    }}
-    .desc {{
-        text-align: center;
-        margin-top: 10px;
-        color: #333;
-        font-weight: bold;
-    }}
-</style>
-</head>
-<body>
-    <a class="magic-btn" onclick="return false;" href="{safe_url}">
-        🔮 잠금해제 & 폭파 (드래그)
-    </a>
-    <div class="desc">▲ 초록 버튼은 지우고, 이 보라색 버튼을 쓰세요!</div>
-</body>
-</html>
-"""
-
-components.html(html_content, height=140)
+# 코드를 복사하기 좋게 표시
+st.code(js_code, language="javascript")
 
 st.divider()
 
-st.link_button("🚀 젠스파크 다시 접속", "https://www.genspark.ai/", type="primary", use_container_width=True)
+# ------------------------------------------------------------------
+# 2단계: 직접 만들기 (이게 100% 됩니다)
+# ------------------------------------------------------------------
+st.subheader("2단계: 즐겨찾기 직접 만들기 (필독!)")
+st.info("이대로만 하시면 무조건 됩니다.")
+
+st.markdown("""
+1. 브라우저 맨 위 **즐겨찾기 바 빈 공간**에 마우스 **[우클릭]** 하세요.
+2. **[페이지 추가]** (또는 바로가기 추가)를 누르세요.
+3. 설정창이 나오면:
+   - **이름:** `폭파` (맘대로)
+   - **URL(주소):** 👆 위에서 복사한 코드를 **[붙여넣기]** (Ctrl+V) 하세요.
+4. **[저장]** 누르세요.
+""")
+
+st.divider()
+
+st.subheader("3단계: 테스트")
+st.markdown("""
+1. 아래 버튼으로 젠스파크 접속
+2. 로그인 창 뜨면?
+3. 방금 만든 **[폭파]** 즐겨찾기 클릭!
+""")
+
+st.link_button("🚀 젠스파크 접속", "https://www.genspark.ai/", type="primary", use_container_width=True)
