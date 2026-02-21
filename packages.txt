@@ -1,1 +1,3 @@
-fonts-nanum
+%%writefile packages.txt
+chromium
+chromium-driver
