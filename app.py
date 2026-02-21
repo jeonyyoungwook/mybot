@@ -2,121 +2,102 @@ import streamlit as st
 import urllib.parse
 import streamlit.components.v1 as components
 
-# 1. 페이지 설정
-st.set_page_config(page_title="GenSpark Secret Link", page_icon="🕵️‍♂️", layout="centered")
+st.set_page_config(page_title="GenSpark 마법 접속기", page_icon="🪄", layout="centered")
 
-# 2. 언어 설정 (간소화)
-if 'lang' not in st.session_state:
-    st.session_state.lang = 'ko'
+# --- 스타일 설정 ---
+st.markdown("""
+<style>
+    .big-font { font-size:20px !important; font-weight: bold; }
+    .highlight { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+</style>
+""", unsafe_allow_html=True)
 
-# 3. 데이터
-text_data = {
-    'ko': {
-        'title': "🕵️‍♂️ GenSpark 시크릿 접속기",
-        'subtitle': "로그인 없이 검색하는 두 가지 방법!",
-        'tab_simple': "1️⃣ 간편 방법 (시크릿모드)",
-        'tab_advanced': "2️⃣ 영구 차단 (PC 전용)",
-        'adv_title': "🛠️ 확장 프로그램으로 로그인 창 없애기",
-        'adv_desc': """
-        이 방법은 PC에서 **한 번만 설정하면**, 앞으로 시크릿 모드를 안 써도 로그인 창이 안 뜹니다.
-        (Tampermonkey 확장 프로그램이 필요합니다.)
-        """,
-        'step1': "1. 브라우저에 **Tampermonkey** 확장 프로그램을 설치하세요.",
-        'step2': "2. 아래 **스크립트 코드**를 복사하세요.",
-        'step3': "3. Tampermonkey에서 [새 스크립트 만들기] -> 붙여넣기 -> 저장하세요.",
-        'script_code': """
-// ==UserScript==
-// @name         GenSpark Login Remover
-// @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  GenSpark 로그인 팝업 강제 삭제
-// @author       You
-// @match        https://www.genspark.ai/*
-// @grant        none
-// ==/UserScript==
+st.title("🪄 GenSpark 로그인 제거 마법")
+st.caption("확장 프로그램 설치? 필요 없습니다! 즐겨찾기 버튼 하나면 끝.")
 
-(function() {
-    'use strict';
-    // 1초마다 로그인 팝업 감지 후 삭제
-    setInterval(() => {
-        const loginModal = document.querySelector('div[class*="AuthModal"]'); // 로그인 창 클래스명 감지
-        const backdrop = document.querySelector('div[class*="backdrop"]'); // 배경 어둡게 하는 것
+st.divider()
 
-        if (loginModal) {
-            loginModal.remove();
-            console.log("로그인 창 삭제됨");
-        }
-        if (backdrop) {
-            backdrop.remove();
-        }
-        // 스크롤 막힘 풀기
+# 1. 검색어 입력
+st.subheader("1단계: 검색할 내용 입력")
+query = st.text_input("질문", placeholder="예: 최신 AI 뉴스 요약해줘", label_visibility="collapsed")
+
+# URL 생성
+if query:
+    encoded_query = urllib.parse.quote(query)
+    target_url = f"https://www.genspark.ai/search?query={encoded_query}"
+else:
+    target_url = "https://www.genspark.ai/"
+
+# 접속 버튼
+st.link_button(f"🚀 GenSpark로 접속하기 (클릭)", target_url, type="primary", use_container_width=True)
+
+st.divider()
+
+# 2. 북마크릿 (핵심 기능)
+st.subheader("2단계: 로그인 창이 뜨면?")
+st.write("아래 **파란색 버튼**을 마우스로 끌어서, 브라우저 상단 **즐겨찾기(북마크) 바**에 놓으세요.")
+
+# 자바스크립트 코드 (로그인 창 삭제용)
+js_code = """javascript:(function(){
+    var m = document.querySelectorAll('div[class*="AuthModal"], div[class*="backdrop"]');
+    if(m.length > 0){
+        m.forEach(e => e.remove());
         document.body.style.overflow = 'auto';
-    }, 1000);
-})();
-        """,
-        'input_ph': "검색어를 입력하세요",
-        'btn_search': "🔍 '{query}' 검색하기"
+        alert('로그인 창을 삭제했습니다! 🕵️‍♂️');
+    } else {
+        alert('로그인 창이 감지되지 않았습니다.');
     }
-}
-t = text_data['ko'] # 한국어 예시
+})();"""
 
-st.title(t['title'])
-st.write(t['subtitle'])
+# HTML 컴포넌트로 드래그 가능한 링크 생성
+# 주의: Streamlit 보안상 markdown으로는 javascript: 링크가 안 먹힐 수 있어 html 컴포넌트 사용
+html_content = f"""
+<style>
+    .bookmarklet {{
+        display: block;
+        width: 100%;
+        background-color: #0068c9;
+        color: white;
+        text-align: center;
+        padding: 15px 0;
+        text-decoration: none;
+        font-family: sans-serif;
+        font-weight: bold;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        cursor: grab;
+    }}
+    .bookmarklet:hover {{
+        background-color: #0053a0;
+    }}
+    .desc {{
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }}
+</style>
 
-# 탭 구분
-tab1, tab2 = st.tabs([t['tab_simple'], t['tab_advanced']])
+<!-- 이 링크를 드래그하게 만드는 것이 핵심 -->
+<a href='{js_code}' class="bookmarklet" onclick="return false;">
+    🚫 로그인 제거 (이 버튼을 즐겨찾기 바에 드래그!)
+</a>
+<div class="desc">▲ 클릭하지 말고 마우스로 끌어서 브라우저 상단 주소창 아래에 놓으세요.</div>
+"""
 
-# --- 탭 1: 기존 시크릿 모드 방식 (모바일/PC 공용) ---
-with tab1:
-    st.info("설치 없이 바로 쓸 수 있는 가장 쉬운 방법입니다.")
+components.html(html_content, height=100)
+
+# 3. 사용법 설명 이미지/텍스트
+with st.expander("❓ 어떻게 쓰는지 모르겠어요 (사용법 보기)"):
     st.markdown("""
-    1. 아래 검색창에 질문 입력
-    2. 생성된 버튼을 **우클릭(PC)**하거나 **꾹 누르기(모바일)**
-    3. **[시크릿 창에서 열기]** 선택
+    #### 1️⃣ 세팅하기 (딱 한 번만!)
+    1. 브라우저 주소창 아래에 **즐겨찾기 바**가 보이게 하세요. (안 보이면 `Ctrl + Shift + B` 누르기)
+    2. 위에 있는 **파란색 [🚫 로그인 제거] 버튼**을 마우스로 클릭한 상태로 끌어서 **즐겨찾기 바**에 놓으세요.
+    
+    #### 2️⃣ 사용하기
+    1. GenSpark에 접속해서 검색하다가 **로그인 창**이 뜨면?
+    2. 방금 추가한 즐겨찾기 버튼(**🚫 로그인 제거**)을 클릭하세요.
+    3. 펑! 하고 로그인 창이 사라집니다. 🪄
     """)
-    
-    query = st.text_input("질문 입력", placeholder=t['input_ph'])
-    
-    if query:
-        encoded_query = urllib.parse.quote(query)
-        target_url = f"https://www.genspark.ai/search?query={encoded_query}"
-        btn_text = t['btn_search'].replace("{query}", query)
-        
-        # 버튼 영역
-        st.link_button(label=btn_text, url=target_url, type="primary", use_container_width=True)
-        
-        # 주소 복사 버튼 (자바스크립트)
-        copy_html = f"""
-        <input type="text" value="{target_url}" id="myInput" style="position: absolute; left: -9999px;">
-        <button onclick="copyFunction()" style="width:100%; padding:8px; cursor:pointer; margin-top:5px; border-radius:5px; border:1px solid #ccc;">📋 주소 복사하기 (직접 붙여넣기용)</button>
-        <script>
-        function copyFunction() {{
-            var copyText = document.getElementById("myInput");
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value).then(function() {{ alert("복사완료! 시크릿창에 붙여넣으세요."); }});
-        }}
-        </script>
-        """
-        components.html(copy_html, height=50)
 
-# --- 탭 2: 확장 프로그램/스크립트 방식 (캡처 내용 반영) ---
-with tab2:
-    st.warning("⚠️ 이 방법은 PC(크롬, 엣지 등)에서만 가능합니다.", icon="💻")
-    st.markdown(f"### {t['adv_title']}")
-    st.markdown(t['adv_desc'])
-    
-    st.divider()
-    
-    st.markdown(f"**{t['step1']}**")
-    st.link_button("Tampermonkey 설치하러 가기 (Chrome 웹스토어)", "https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo")
-    
-    st.divider()
-    
-    st.markdown(f"**{t['step2']}**")
-    st.code(t['script_code'], language='javascript')
-    st.caption("▲ 오른쪽 위 복사 버튼을 누르세요.")
-    
-    st.divider()
-    st.markdown(f"**{t['step3']}**")
-    st.success("설정이 완료되면, 일반 모드에서도 로그인 창이 자동으로 사라집니다!")
+st.info("💡 꿀팁: 이 방법은 시크릿 모드를 켜지 않아도 작동합니다!")
