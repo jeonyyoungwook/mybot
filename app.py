@@ -1,103 +1,60 @@
 import streamlit as st
 import urllib.parse
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="GenSpark 마법 접속기", page_icon="🪄", layout="centered")
 
-# --- 스타일 설정 ---
-st.markdown("""
-<style>
-    .big-font { font-size:20px !important; font-weight: bold; }
-    .highlight { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
-</style>
-""", unsafe_allow_html=True)
-
-st.title("🪄 GenSpark 로그인 제거 마법")
-st.caption("확장 프로그램 설치? 필요 없습니다! 즐겨찾기 버튼 하나면 끝.")
+st.title("🪄 GenSpark 로그인 제거기")
+st.markdown("확장 프로그램 없이, **즐겨찾기(북마크)**를 이용해 로그인 창을 뚫는 방법입니다.")
 
 st.divider()
 
-# 1. 검색어 입력
-st.subheader("1단계: 검색할 내용 입력")
-query = st.text_input("질문", placeholder="예: 최신 AI 뉴스 요약해줘", label_visibility="collapsed")
+# --- 1단계: 검색 기능 ---
+st.subheader("Step 1. 검색하고 접속하기")
+query = st.text_input("질문 입력", placeholder="예: 최신 AI 트렌드 알려줘")
 
-# URL 생성
 if query:
     encoded_query = urllib.parse.quote(query)
     target_url = f"https://www.genspark.ai/search?query={encoded_query}"
 else:
     target_url = "https://www.genspark.ai/"
 
-# 접속 버튼
-st.link_button(f"🚀 GenSpark로 접속하기 (클릭)", target_url, type="primary", use_container_width=True)
+st.link_button("🚀 GenSpark 접속 (새창)", target_url, type="primary", use_container_width=True)
 
 st.divider()
 
-# 2. 북마크릿 (핵심 기능)
-st.subheader("2단계: 로그인 창이 뜨면?")
-st.write("아래 **파란색 버튼**을 마우스로 끌어서, 브라우저 상단 **즐겨찾기(북마크) 바**에 놓으세요.")
+# --- 2단계: 북마크 만들기 (핵심) ---
+st.subheader("Step 2. '로그인 제거' 버튼 만들기")
+st.info("이 설정은 딱 한 번만 하면 평생 쓸 수 있습니다!")
 
-# 자바스크립트 코드 (로그인 창 삭제용)
-js_code = """javascript:(function(){
-    var m = document.querySelectorAll('div[class*="AuthModal"], div[class*="backdrop"]');
-    if(m.length > 0){
-        m.forEach(e => e.remove());
-        document.body.style.overflow = 'auto';
-        alert('로그인 창을 삭제했습니다! 🕵️‍♂️');
-    } else {
-        alert('로그인 창이 감지되지 않았습니다.');
-    }
-})();"""
+st.markdown("""
+**👇 아래 순서대로 따라하세요:**
 
-# HTML 컴포넌트로 드래그 가능한 링크 생성
-# 주의: Streamlit 보안상 markdown으로는 javascript: 링크가 안 먹힐 수 있어 html 컴포넌트 사용
-html_content = f"""
-<style>
-    .bookmarklet {{
-        display: block;
-        width: 100%;
-        background-color: #0068c9;
-        color: white;
-        text-align: center;
-        padding: 15px 0;
-        text-decoration: none;
-        font-family: sans-serif;
-        font-weight: bold;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        cursor: grab;
-    }}
-    .bookmarklet:hover {{
-        background-color: #0053a0;
-    }}
-    .desc {{
-        text-align: center;
-        font-size: 12px;
-        color: #666;
-        margin-top: 5px;
-    }}
-</style>
+1. 브라우저 상단 주소창 아래 빈 곳에 마우스를 대고 **우클릭** 하세요.
+2. **[페이지 추가]** 또는 **[바로가기 추가]**를 누르세요.
+3. **이름** 칸에는: `로그인 제거` 라고 쓰세요.
+4. **URL(주소)** 칸에는: 아래 **검은 박스 안의 코드**를 복사해서 붙여넣으세요.
+""")
 
-<!-- 이 링크를 드래그하게 만드는 것이 핵심 -->
-<a href='{js_code}' class="bookmarklet" onclick="return false;">
-    🚫 로그인 제거 (이 버튼을 즐겨찾기 바에 드래그!)
-</a>
-<div class="desc">▲ 클릭하지 말고 마우스로 끌어서 브라우저 상단 주소창 아래에 놓으세요.</div>
-"""
+# 자바스크립트 코드 (한 줄로 압축)
+js_code = """javascript:(function(){const m=document.querySelectorAll('div[class*="AuthModal"],div[class*="backdrop"]');if(m.length>0){m.forEach(e=>e.remove());document.body.style.overflow='auto';}else{alert('로그인 창이 안 보입니다!');}})();"""
 
-components.html(html_content, height=100)
+# 코드 복사하기 쉽게 보여주기
+st.code(js_code, language="javascript")
+st.caption("▲ 위 코드를 복사해서 북마크의 'URL' 또는 '주소' 칸에 넣으세요.")
 
-# 3. 사용법 설명 이미지/텍스트
-with st.expander("❓ 어떻게 쓰는지 모르겠어요 (사용법 보기)"):
-    st.markdown("""
-    #### 1️⃣ 세팅하기 (딱 한 번만!)
-    1. 브라우저 주소창 아래에 **즐겨찾기 바**가 보이게 하세요. (안 보이면 `Ctrl + Shift + B` 누르기)
-    2. 위에 있는 **파란색 [🚫 로그인 제거] 버튼**을 마우스로 클릭한 상태로 끌어서 **즐겨찾기 바**에 놓으세요.
-    
-    #### 2️⃣ 사용하기
-    1. GenSpark에 접속해서 검색하다가 **로그인 창**이 뜨면?
-    2. 방금 추가한 즐겨찾기 버튼(**🚫 로그인 제거**)을 클릭하세요.
-    3. 펑! 하고 로그인 창이 사라집니다. 🪄
+st.divider()
+
+# --- 3단계: 사용법 ---
+st.subheader("Step 3. 사용하는 법")
+st.success("""
+1. GenSpark에서 검색하다가 **로그인 창**이 화면을 가리면?
+2. 방금 만든 **[로그인 제거] 북마크**를 클릭하세요.
+3. 로그인 창이 즉시 사라집니다! 🎉
+""")
+
+with st.expander("동작 원리가 뭔가요?"):
+    st.write("""
+    이 코드는 '북마크릿(Bookmarklet)'이라고 부릅니다. 
+    북마크를 누르는 순간, 페이지에 있는 '로그인 팝업(AuthModal)' 요소를 찾아서 
+    강제로 삭제(remove)하는 자바스크립트 명령을 내리는 원리입니다.
     """)
-
-st.info("💡 꿀팁: 이 방법은 시크릿 모드를 켜지 않아도 작동합니다!")
