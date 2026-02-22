@@ -31,8 +31,8 @@ with st.container():
         try:
             # Streamlit Secrets에서 API 키를 가져옵니다.
             if "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-                
+                api_key = st.secrets["AIzaSyDT_FHAJ7Ukzv1aUHDcCRqydHHZfrE8VAY"]
+                            
                 with st.spinner("AI가 답변을 생성 중입니다..."):
                     genai.configure(api_key=api_key)
                     # 무료/고속 모델 사용
@@ -138,3 +138,4 @@ with col_prac2:
 
 st.divider()
 st.caption("🔥 일반기계기사 합격을 기원합니다! | Created with Python & Streamlit")
+
