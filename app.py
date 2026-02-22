@@ -95,6 +95,64 @@ def add_youtube_search_links(text):
     return modified_text
 
 # --------------------------------------------------------------------------------
+# ✅ 모델 선택 함수 개선
+# --------------------------------------------------------------------------------
+def get_best_gemini_model():
+    """
+    사용 가능한 최신 Gemini 모델을 우선순위에 따라 선택
+    """
+    try:
+        available_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+        
+        # 우선순위: Gemini 3 > Gemini 2.5 > Gemini 2.0 > Gemini 1.5
+        priority_order = [
+            'gemini-3',
+            'gemini-2.5',
+            'gemini-2.0', 
+            'gemini-1.5',
+            'gemini-pro'
+        ]
+        
+        for priority in priority_order:
+            for model_name in available_models:
+                if priority in model_name.lower():
+                    return model_name
+        
+        # 우선순위에 없으면 첫 번째 사용 가능 모델 반환
+        if available_models:
+            return available_models[0]
+        
+        return None
+        
+    except Exception as e:
+        st.error(f"모델 목록 조회 실패: {e}")
+        return None
+
+def get_model_display_name(model_name):
+    """
+    모델 이름을 사용자 친화적으로 변환
+    """
+    if not model_name:
+        return "알 수 없음"
+    
+    model_mapping = {
+        'gemini-3': 'Gemini 3 Flash',
+        'gemini-2.5': 'Gemini 2.5 Flash',
+        'gemini-2.0': 'Gemini 2.0 Flash',
+        'gemini-1.5': 'Gemini 1.5 Pro',
+        'gemini-pro': 'Gemini Pro'
+    }
+    
+    for key, display_name in model_mapping.items():
+        if key in model_name.lower():
+            return display_name
+    
+    return model_name
+
+# --------------------------------------------------------------------------------
 # [Part 1] Gemini AI 튜터
 # --------------------------------------------------------------------------------
 
@@ -131,20 +189,8 @@ with st.container():
                     api_key = st.secrets["GOOGLE_API_KEY"]
                     genai.configure(api_key=api_key)
                     
-                    with st.spinner("AI가 답변을 생성 중입니다..."):
-                        available_models = []
-                        for m in genai.list_models():
-                            if 'generateContent' in m.supported_generation_methods:
-                                available_models.append(m.name)
-                        
-                        model_name = None
-                        for model_candidate in available_models:
-                            if 'gemini-1.5' in model_candidate:
-                                model_name = model_candidate
-                                break
-                        
-                        if not model_name and available_models:
-                            model_name = available_models[0]
+                    with st.spinner("🤖 AI가 답변을 생성 중입니다..."):
+                        model_name = get_best_gemini_model()
                         
                         if model_name:
                             model = genai.GenerativeModel(model_name)
@@ -170,12 +216,16 @@ with st.container():
                             st.session_state.model_name = model_name
                             st.session_state.uploaded_image = None
                         else:
-                            st.error("사용 가능한 모델을 찾을 수 없습니다.")
+                            st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
-                    st.error("⚠️ API 키가 설정되지 않았습니다.")
+                    st.error("⚠️ API 키가 설정되지 않았습니다. Streamlit Secrets에 GOOGLE_API_KEY를 추가하세요.")
                     
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
+                if "429" in str(e):
+                    st.warning("⏰ API 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.")
+                elif "403" in str(e):
+                    st.warning("🔑 API 키가 유효하지 않습니다. 새로운 키를 발급받으세요.")
     
     # ========== 탭 2: 이미지 질문 ==========
     with tab2:
@@ -215,20 +265,8 @@ with st.container():
                     api_key = st.secrets["GOOGLE_API_KEY"]
                     genai.configure(api_key=api_key)
                     
-                    with st.spinner("AI가 이미지를 분석 중입니다..."):
-                        available_models = []
-                        for m in genai.list_models():
-                            if 'generateContent' in m.supported_generation_methods:
-                                available_models.append(m.name)
-                        
-                        model_name = None
-                        for model_candidate in available_models:
-                            if 'gemini-1.5' in model_candidate or 'vision' in model_candidate.lower():
-                                model_name = model_candidate
-                                break
-                        
-                        if not model_name and available_models:
-                            model_name = available_models[0]
+                    with st.spinner("🖼️ AI가 이미지를 분석 중입니다..."):
+                        model_name = get_best_gemini_model()
                         
                         if model_name:
                             model = genai.GenerativeModel(model_name)
@@ -263,14 +301,16 @@ with st.container():
                             st.session_state.model_name = model_name
                             st.session_state.uploaded_image = image
                         else:
-                            st.error("사용 가능한 모델을 찾을 수 없습니다.")
+                            st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
                     st.error("⚠️ API 키가 설정되지 않았습니다.")
                     
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
-                if "403" in str(e):
-                    st.warning("API 키가 유출되었거나 만료되었습니다. 새로운 키를 발급받으세요.")
+                if "429" in str(e):
+                    st.warning("⏰ API 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.")
+                elif "403" in str(e):
+                    st.warning("🔑 API 키가 유효하지 않습니다.")
 
     # ✅ 위쪽 삭제 버튼
     st.markdown("")
@@ -300,7 +340,25 @@ with st.container():
         st.markdown("---")
         st.markdown("### 💡 AI 답변")
         st.markdown(response_text, unsafe_allow_html=True)
-        st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
+        
+        # ✅ 모델 정보 표시 개선
+        display_name = get_model_display_name(st.session_state.model_name)
+        
+        with st.expander("🤖 사용된 AI 모델 정보", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"""
+                **코어 모델:** {display_name}  
+                **운영 티어:** Free Tier (무료 버전)  
+                **기술 ID:** `{st.session_state.model_name}`
+                """)
+            with col2:
+                st.markdown("""
+                **지원 기능:**
+                - ✅ 텍스트 생성
+                - ✅ 이미지 분석 (Vision)
+                - ✅ 멀티모달 처리
+                """)
 
 st.divider()
 
