@@ -19,7 +19,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 이미지 업로드 기능 추가
+# [Part 1] Gemini AI 튜터 ✅ 이미지 삭제 버튼 추가
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -29,6 +29,8 @@ if 'model_name' not in st.session_state:
     st.session_state.model_name = None
 if 'uploaded_image' not in st.session_state:
     st.session_state.uploaded_image = None
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0  # ✅ 이미지 업로더 리셋용 키
 
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -75,7 +77,7 @@ with st.container():
                             
                             st.session_state.ai_response = response.text
                             st.session_state.model_name = model_name
-                            st.session_state.uploaded_image = None  # 이미지 초기화
+                            st.session_state.uploaded_image = None
                         else:
                             st.error("사용 가능한 모델을 찾을 수 없습니다.")
                 else:
@@ -88,13 +90,26 @@ with st.container():
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
-        with st.form(key="image_question_form", clear_on_submit=False):
-            uploaded_file = st.file_uploader(
-                "이미지 업로드 (JPG, PNG)", 
-                type=['jpg', 'jpeg', 'png'],
-                help="문제 사진이나 이해가 안 되는 부분 스크린샷을 올려주세요"
-            )
+        # ✅ 이미지 업로더 (동적 key 사용으로 리셋 가능)
+        uploaded_file = st.file_uploader(
+            "이미지 업로드 (JPG, PNG)", 
+            type=['jpg', 'jpeg', 'png'],
+            help="문제 사진이나 이해가 안 되는 부분 스크린샷을 올려주세요",
+            key=f"uploader_{st.session_state.uploader_key}"
+        )
+        
+        # ✅ 업로드된 이미지 미리보기 + 이미지 삭제 버튼
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file)
+            st.image(image, caption="업로드된 이미지", use_container_width=True)
             
+            # ✅ 이미지 삭제 버튼
+            if st.button("🖼️ 이미지 삭제", key="delete_image"):
+                st.session_state.uploader_key += 1  # key 변경으로 업로더 리셋
+                st.session_state.uploaded_image = None
+                st.rerun()
+        
+        with st.form(key="image_question_form", clear_on_submit=True):
             image_query = st.text_input(
                 "이미지에 대한 질문 (선택)", 
                 placeholder="예: 이 문제 풀이 과정 설명해줘"
@@ -105,11 +120,6 @@ with st.container():
                 image_submit_btn = st.form_submit_button("🔍 이미지 질문", use_container_width=True)
             with col2:
                 pass
-        
-        # 업로드된 이미지 미리보기
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file)
-            st.image(image, caption="업로드된 이미지", use_container_width=True)
         
         if image_submit_btn and uploaded_file is not None:
             try:
@@ -123,7 +133,6 @@ with st.container():
                             if 'generateContent' in m.supported_generation_methods:
                                 available_models.append(m.name)
                         
-                        # Vision 모델 우선 선택
                         model_name = None
                         for model_candidate in available_models:
                             if 'gemini-1.5' in model_candidate or 'vision' in model_candidate.lower():
@@ -136,16 +145,13 @@ with st.container():
                         if model_name:
                             model = genai.GenerativeModel(model_name)
                             
-                            # 이미지 열기
                             image = Image.open(uploaded_file)
                             
-                            # 질문 텍스트 생성
                             if image_query:
                                 prompt = image_query
                             else:
                                 prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요."
                             
-                            # 이미지 + 텍스트로 질문
                             response = model.generate_content([prompt, image])
                             
                             st.session_state.ai_response = response.text
@@ -161,31 +167,32 @@ with st.container():
                 if "403" in str(e):
                     st.warning("API 키가 유출되었거나 만료되었습니다. 새로운 키를 발급받으세요.")
 
-    # ✅ 위쪽 삭제 버튼
+    # ✅ 위쪽 삭제 버튼 (질문 + 이미지 모두 삭제)
     st.markdown("")
-    if st.button("🗑️ 삭제", key="delete_top"):
+    if st.button("🗑️ 전체 삭제", key="delete_top"):
         st.session_state.ai_response = None
         st.session_state.model_name = None
         st.session_state.uploaded_image = None
+        st.session_state.uploader_key += 1  # 이미지 업로더도 리셋
         st.rerun()
 
     # ✅ 저장된 답변 표시
     if st.session_state.ai_response:
         st.success("답변 완료!")
         
-        # 이미지 질문이었다면 이미지도 다시 표시
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", width=400)
         
         st.markdown(f"**💡 AI 답변:**\n\n{st.session_state.ai_response}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
         
-        # ✅ 아래쪽 삭제 버튼
+        # ✅ 아래쪽 삭제 버튼 (질문 + 이미지 모두 삭제)
         st.markdown("")
         if st.button("🗑️ 질문 삭제", key="delete_bottom"):
             st.session_state.ai_response = None
             st.session_state.model_name = None
             st.session_state.uploaded_image = None
+            st.session_state.uploader_key += 1  # 이미지 업로더도 리셋
             st.rerun()
 
 st.divider()
