@@ -18,7 +18,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 (키 입력창 삭제 버전)
+# [Part 1] Gemini AI 튜터 (수정됨)
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -29,9 +29,9 @@ with st.container():
 
     if query:
         try:
-            # Streamlit Secrets에서 API 키를 가져옵니다.
+            # [수정된 부분] Streamlit Secrets에서 'GOOGLE_API_KEY'라는 이름의 변수를 가져옵니다.
             if "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["AIzaSyDT_FHAJ7Ukzv1aUHDcCRqydHHZfrE8VAY"]
+                api_key = st.secrets["GOOGLE_API_KEY"]
                             
                 with st.spinner("AI가 답변을 생성 중입니다..."):
                     genai.configure(api_key=api_key)
@@ -42,7 +42,7 @@ with st.container():
                     st.success("답변 완료!")
                     st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
             else:
-                st.error("⚠️ API 키 설정이 필요합니다. (Secrets 설정을 확인하세요)")
+                st.error("⚠️ API 키 설정이 필요합니다. (Streamlit Cloud의 Secrets 설정을 확인하세요)")
                 
         except Exception as e:
             st.error(f"에러 발생: {e}")
@@ -138,4 +138,3 @@ with col_prac2:
 
 st.divider()
 st.caption("🔥 일반기계기사 합격을 기원합니다! | Created with Python & Streamlit")
-
