@@ -69,7 +69,11 @@ def make_links_clickable(text):
     return re.sub(url_pattern, replace_url, text)
 
 def add_youtube_search_links(text):
-    """주요 키워드에 유튜브 검색 링크 추가"""
+    """
+    주요 키워드에 유튜브 검색 링크 추가
+    - 이미 링크 형식 [...](...)  안에 있는 텍스트는 제외
+    - AI 답변의 일반 텍스트에만 적용
+    """
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
@@ -78,24 +82,44 @@ def add_youtube_search_links(text):
         "응력", "변형률", "전단력", "굽힘모멘트"
     ]
     
-    modified_text = text
+    # 먼저 기존 마크다운 링크를 임시 플레이스홀더로 보호
+    link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+    links_found = re.findall(link_pattern, text)
+    
+    # 링크를 플레이스홀더로 교체
+    protected_text = text
+    placeholders = []
+    for i, (link_text, link_url) in enumerate(links_found):
+        placeholder = f"__LINK_PLACEHOLDER_{i}__"
+        original = f"[{link_text}]({link_url})"
+        protected_text = protected_text.replace(original, placeholder, 1)
+        placeholders.append((placeholder, original))
+    
+    # 키워드에 유튜브 링크 추가
+    modified_text = protected_text
     used_keywords = set()
     
     for keyword in keywords:
-        # 각 키워드를 한 번만 링크로 변환
         if keyword in modified_text and keyword not in used_keywords:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
             youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
             
-            pattern = f"(?<!\\[)\\b({re.escape(keyword)})\\b(?!\\])"
-            replacement = f"[\\1 📺]({youtube_link})"
-            modified_text = re.sub(pattern, replacement, modified_text, count=1)
-            used_keywords.add(keyword)
+            # 단어 경계로 정확히 매칭
+            pattern = rf'\b({re.escape(keyword)})\b'
+            
+            if re.search(pattern, modified_text):
+                replacement = f'[\\1 📺]({youtube_link})'
+                modified_text = re.sub(pattern, replacement, modified_text, count=1)
+                used_keywords.add(keyword)
+    
+    # 플레이스홀더를 원래 링크로 복원
+    for placeholder, original in placeholders:
+        modified_text = modified_text.replace(placeholder, original)
     
     return modified_text
 
 # --------------------------------------------------------------------------------
-# ✅ 모델 선택 함수 개선
+# ✅ 모델 선택 함수
 # --------------------------------------------------------------------------------
 def get_best_gemini_model():
     """
@@ -216,7 +240,7 @@ with st.container():
                             st.session_state.model_name = model_name
                             st.session_state.uploaded_image = None
                         else:
-                            st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다.")
+                            st.error("❌ 사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
                     st.error("⚠️ API 키가 설정되지 않았습니다. Streamlit Secrets에 GOOGLE_API_KEY를 추가하세요.")
                     
@@ -301,7 +325,7 @@ with st.container():
                             st.session_state.model_name = model_name
                             st.session_state.uploaded_image = image
                         else:
-                            st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다.")
+                            st.error("❌ 사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
                     st.error("⚠️ API 키가 설정되지 않았습니다.")
                     
@@ -334,7 +358,7 @@ with st.container():
         # ✅ 링크 변환 순서: 유튜브 카드 → 키워드 검색 → 일반 링크
         response_text = st.session_state.ai_response
         response_text = format_youtube_links(response_text)  # 유튜브 → 카드
-        response_text = add_youtube_search_links(response_text)  # 키워드 검색
+        response_text = add_youtube_search_links(response_text)  # 키워드 검색 (안전하게)
         response_text = make_links_clickable(response_text)  # 일반 링크
         
         st.markdown("---")
