@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -18,7 +19,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ Form 방식으로 변경 (삭제 후 재답변 방지)
+# [Part 1] Gemini AI 튜터 ✅ 이미지 업로드 기능 추가
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -26,78 +27,156 @@ if 'ai_response' not in st.session_state:
     st.session_state.ai_response = None
 if 'model_name' not in st.session_state:
     st.session_state.model_name = None
+if 'uploaded_image' not in st.session_state:
+    st.session_state.uploaded_image = None
 
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
-    st.caption("궁금한 개념(예: 베르누이 방정식, 랭킨 사이클)을 입력하면 AI가 설명해줍니다.")
+    st.caption("궁금한 개념을 텍스트 또는 **이미지(스크린샷, 문제 사진)**로 질문하세요!")
 
-    # ✅ Form 사용 - 엔터 또는 버튼 클릭 시에만 실행
-    with st.form(key="question_form", clear_on_submit=True):
-        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+    # ✅ 탭으로 구분: 텍스트 질문 / 이미지 질문
+    tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
+    
+    # ========== 탭 1: 텍스트 질문 ==========
+    with tab1:
+        with st.form(key="text_question_form", clear_on_submit=True):
+            query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+            
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                text_submit_btn = st.form_submit_button("🔍 질문하기", use_container_width=True)
+            with col2:
+                pass
+
+        if text_submit_btn and query:
+            try:
+                if "GOOGLE_API_KEY" in st.secrets:
+                    api_key = st.secrets["GOOGLE_API_KEY"]
+                    genai.configure(api_key=api_key)
+                    
+                    with st.spinner("AI가 답변을 생성 중입니다..."):
+                        available_models = []
+                        for m in genai.list_models():
+                            if 'generateContent' in m.supported_generation_methods:
+                                available_models.append(m.name)
+                        
+                        model_name = None
+                        for model_candidate in available_models:
+                            if 'gemini-1.5' in model_candidate:
+                                model_name = model_candidate
+                                break
+                        
+                        if not model_name and available_models:
+                            model_name = available_models[0]
+                        
+                        if model_name:
+                            model = genai.GenerativeModel(model_name)
+                            response = model.generate_content(query)
+                            
+                            st.session_state.ai_response = response.text
+                            st.session_state.model_name = model_name
+                            st.session_state.uploaded_image = None  # 이미지 초기화
+                        else:
+                            st.error("사용 가능한 모델을 찾을 수 없습니다.")
+                else:
+                    st.error("⚠️ API 키가 설정되지 않았습니다.")
+                    
+            except Exception as e:
+                st.error(f"❌ 에러 발생: {e}")
+    
+    # ========== 탭 2: 이미지 질문 ==========
+    with tab2:
+        st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            submit_btn = st.form_submit_button("🔍 질문하기", use_container_width=True)
-        with col2:
-            pass
+        with st.form(key="image_question_form", clear_on_submit=False):
+            uploaded_file = st.file_uploader(
+                "이미지 업로드 (JPG, PNG)", 
+                type=['jpg', 'jpeg', 'png'],
+                help="문제 사진이나 이해가 안 되는 부분 스크린샷을 올려주세요"
+            )
+            
+            image_query = st.text_input(
+                "이미지에 대한 질문 (선택)", 
+                placeholder="예: 이 문제 풀이 과정 설명해줘"
+            )
+            
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                image_submit_btn = st.form_submit_button("🔍 이미지 질문", use_container_width=True)
+            with col2:
+                pass
+        
+        # 업로드된 이미지 미리보기
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file)
+            st.image(image, caption="업로드된 이미지", use_container_width=True)
+        
+        if image_submit_btn and uploaded_file is not None:
+            try:
+                if "GOOGLE_API_KEY" in st.secrets:
+                    api_key = st.secrets["GOOGLE_API_KEY"]
+                    genai.configure(api_key=api_key)
+                    
+                    with st.spinner("AI가 이미지를 분석 중입니다..."):
+                        available_models = []
+                        for m in genai.list_models():
+                            if 'generateContent' in m.supported_generation_methods:
+                                available_models.append(m.name)
+                        
+                        # Vision 모델 우선 선택
+                        model_name = None
+                        for model_candidate in available_models:
+                            if 'gemini-1.5' in model_candidate or 'vision' in model_candidate.lower():
+                                model_name = model_candidate
+                                break
+                        
+                        if not model_name and available_models:
+                            model_name = available_models[0]
+                        
+                        if model_name:
+                            model = genai.GenerativeModel(model_name)
+                            
+                            # 이미지 열기
+                            image = Image.open(uploaded_file)
+                            
+                            # 질문 텍스트 생성
+                            if image_query:
+                                prompt = image_query
+                            else:
+                                prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요."
+                            
+                            # 이미지 + 텍스트로 질문
+                            response = model.generate_content([prompt, image])
+                            
+                            st.session_state.ai_response = response.text
+                            st.session_state.model_name = model_name
+                            st.session_state.uploaded_image = image
+                        else:
+                            st.error("사용 가능한 모델을 찾을 수 없습니다.")
+                else:
+                    st.error("⚠️ API 키가 설정되지 않았습니다.")
+                    
+            except Exception as e:
+                st.error(f"❌ 에러 발생: {e}")
+                if "403" in str(e):
+                    st.warning("API 키가 유출되었거나 만료되었습니다. 새로운 키를 발급받으세요.")
 
-    # ✅ 위쪽 삭제 버튼 (Form 바깥에 배치)
+    # ✅ 위쪽 삭제 버튼
+    st.markdown("")
     if st.button("🗑️ 삭제", key="delete_top"):
         st.session_state.ai_response = None
         st.session_state.model_name = None
+        st.session_state.uploaded_image = None
         st.rerun()
-
-    # 질문 제출 시에만 AI 호출
-    if submit_btn and query:
-        try:
-            if "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-                genai.configure(api_key=api_key)
-                
-                with st.spinner("AI가 답변을 생성 중입니다..."):
-                    # ✅ 사용 가능한 모델 자동 감지
-                    available_models = []
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods:
-                            available_models.append(m.name)
-                    
-                    model_name = None
-                    for model_candidate in available_models:
-                        if 'gemini-1.5' in model_candidate:
-                            model_name = model_candidate
-                            break
-                    
-                    if not model_name and available_models:
-                        model_name = available_models[0]
-                    
-                    if model_name:
-                        model = genai.GenerativeModel(model_name)
-                        response = model.generate_content(query)
-                        
-                        st.session_state.ai_response = response.text
-                        st.session_state.model_name = model_name
-                    else:
-                        st.error("사용 가능한 모델을 찾을 수 없습니다.")
-            else:
-                st.error("⚠️ API 키가 설정되지 않았습니다.")
-                st.info("👉 App Settings > Secrets에 GOOGLE_API_KEY를 추가하세요.")
-                
-        except Exception as e:
-            st.error(f"❌ 에러 발생: {e}")
-            
-            if "403" in str(e) or "leaked" in str(e):
-                st.warning("""
-                🚨 **API 키가 유출되었습니다!**
-                
-                해결 방법:
-                1. Google AI Studio에서 기존 키 삭제
-                2. 새 API 키 발급
-                3. App Settings > Secrets에 새 키 등록
-                """)
 
     # ✅ 저장된 답변 표시
     if st.session_state.ai_response:
         st.success("답변 완료!")
+        
+        # 이미지 질문이었다면 이미지도 다시 표시
+        if st.session_state.uploaded_image:
+            st.image(st.session_state.uploaded_image, caption="질문한 이미지", width=400)
+        
         st.markdown(f"**💡 AI 답변:**\n\n{st.session_state.ai_response}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
         
@@ -106,6 +185,7 @@ with st.container():
         if st.button("🗑️ 질문 삭제", key="delete_bottom"):
             st.session_state.ai_response = None
             st.session_state.model_name = None
+            st.session_state.uploaded_image = None
             st.rerun()
 
 st.divider()
