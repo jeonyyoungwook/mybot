@@ -1,140 +1,92 @@
-"""
-Genspark Secret Bot (Windows/Mac Visible Version)
--------------------------------------------------
-내 컴퓨터에서 브라우저가 뜨는 것을 직접 확인할 수 있는 버전입니다.
-"""
+import streamlit as st
 
-import os
-import time
-import argparse
-from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+# 페이지 기본 설정
+st.set_page_config(
+    page_title="일반기계기사 학습 가이드",
+    page_icon="⚙️",
+    layout="centered"
+)
 
-class GensparkBot:
-    def __init__(self, output_dir="output"):
-        self.driver = None
-        self.output_dir = output_dir
-        
-        # 결과 저장 폴더 생성
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-            
-    def setup_driver(self):
-        """Chrome 드라이버 설정 (화면 보이게 설정)"""
-        print("🔧 브라우저 켜는 중...")
-        
-        chrome_options = Options()
-        
-        # [중요] 화면이 보이도록 헤드리스 모드 제거!
-        # chrome_options.add_argument('--headless=new')  <-- 이걸 지웠습니다.
-        
-        # 윈도우에서 안전하게 실행되도록 설정
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--window-size=1920,1080')
-        
-        # 시크릿 모드 (로그인 정보 안 남음)
-        chrome_options.add_argument('--incognito')
-        
-        # "자동화된 소프트웨어입니다" 알림 숨기기
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
+# 제목 및 소개
+st.title("⚙️ 일반기계기사 독학 가이드 🎬")
+st.write("유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다. 주제를 클릭하면 유튜브 검색 결과로 연결됩니다.")
+st.markdown("---")
 
-        try:
-            # 내 컴퓨터에 깔린 크롬 버전에 맞춰 드라이버 자동 설치
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ 브라우저 실행 성공!")
-            return True
-        except Exception as e:
-            print(f"❌ 드라이버 초기화 실패: {e}")
-            print("👉 크롬 브라우저가 켜져 있다면 모두 끄고 다시 시도해보세요.")
-            return False
+# 1. 추천 채널 섹션
+st.header("📺 1. 추천 유튜브 채널")
+st.info("채널명을 클릭하면 해당 채널의 일반기계기사 영상 목록으로 이동합니다.")
 
-    def search(self, query):
-        """검색 수행"""
-        if not self.driver:
-            return
+col1, col2 = st.columns(2)
 
-        try:
-            url = "https://www.genspark.ai/"
-            print(f"\n🌍 Genspark 접속 중... ({url})")
-            self.driver.get(url)
+with col1:
+    st.markdown("👉 **[기계달인 (전과목 강의)](https://www.youtube.com/results?search_query=기계달인+일반기계기사)**")
+    st.markdown("👉 **[에듀윌 기계 (핵심 요약)](https://www.youtube.com/results?search_query=에듀윌+기계기사)**")
+    st.markdown("👉 **[메가파이 (자격증 꿀팁)](https://www.youtube.com/results?search_query=메가파이+기계)**")
 
-            wait = WebDriverWait(self.driver, 20)
-            
-            # 로딩 대기
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(2)
-            
-            print(f"🔍 검색어 입력: '{query}'")
-            
-            # 검색창 찾기
-            search_selectors = [
-                (By.XPATH, "//textarea"),
-                (By.CSS_SELECTOR, "input[type='text']"),
-                (By.CSS_SELECTOR, "[placeholder*='search' i]"),
-            ]
-            
-            search_box = None
-            for by, selector in search_selectors:
-                try:
-                    search_box = wait.until(EC.presence_of_element_located((by, selector)))
-                    break
-                except:
-                    continue
-            
-            if not search_box:
-                raise Exception("검색창을 못 찾았습니다.")
+with col2:
+    st.markdown("👉 **[한솔아카데미 (기출 해설)](https://www.youtube.com/results?search_query=한솔아카데미+일반기계기사)**")
+    st.markdown("👉 **[공밀레 (개념 이해)](https://www.youtube.com/results?search_query=공밀레+기계)**")
 
-            search_box.clear()
-            search_box.send_keys(query)
-            time.sleep(1)
-            search_box.send_keys(Keys.RETURN)
+st.markdown("---")
 
-            print("⏳ 봇이 검색 결과를 보고 있습니다... (20초 대기)")
-            
-            # 화면을 볼 수 있게 충분히 대기
-            time.sleep(20) 
-            
-            # 스크린샷 저장
-            self._take_screenshot("result")
-            print("📸 결과 저장 완료!")
+# 2. 과목별 핵심 강의 섹션
+st.header("🔍 2. 과목별 핵심 강의")
+st.caption("각 항목을 클릭하면 관련 유튜브 강의 검색 결과가 새 창에서 열립니다.")
 
-        except Exception as e:
-            print(f"❌ 오류 발생: {e}")
-        finally:
-            self.close()
+# 재료역학
+with st.expander("1️⃣ 재료역학 (기계구조해석) - 펼쳐보기", expanded=True):
+    st.markdown("""
+    - 🧱 **[기초/입문: 재료역학 기초 강의 보기](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기초)**
+    - 📉 **[SFD/BMD: 전단력/굽힘모멘트 선도 그리기](https://www.youtube.com/results?search_query=재료역학+SFD+BMD)**
+    - ➰ **[보의 처짐: 보의 처짐 공식 및 문제풀이](https://www.youtube.com/results?search_query=재료역학+보의+처짐)**
+    - 🌀 **[모어원: 모어원(Mohr's Circle) 그리는 법](https://www.youtube.com/results?search_query=재료역학+모어원)**
+    - 🏛️ **[기둥/좌굴: 오일러의 좌굴 공식](https://www.youtube.com/results?search_query=재료역학+기둥+좌굴)**
+    - 📝 **[기출문제: 재료역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기출)**
+    """)
 
-    def _take_screenshot(self, name):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.output_dir}/{name}_{timestamp}.png"
-        if self.driver:
-            self.driver.save_screenshot(filename)
-        return filename
+# 열역학
+with st.expander("2️⃣ 기계열역학 (열·유체해석 Part 1)"):
+    st.markdown("""
+    - 🔥 **[기초/법칙: 열역학 1법칙 & 2법칙](https://www.youtube.com/results?search_query=일반기계기사+열역학+법칙)**
+    - 💨 **[이상기체: 이상기체 상태방정식 강의](https://www.youtube.com/results?search_query=열역학+이상기체+상태방정식)**
+    - 🔄 **[동력 사이클: 오토/디젤/사바테 사이클 비교](https://www.youtube.com/results?search_query=열역학+오토+디젤+사이클)**
+    - 🏭 **[증기 사이클: 랭킨 사이클 완벽 정리](https://www.youtube.com/results?search_query=열역학+랭킨사이클)**
+    - ❄️ **[냉동: 냉동 사이클 & 성적계수(COP)](https://www.youtube.com/results?search_query=열역학+냉동사이클)**
+    """)
 
-    def close(self):
-        """종료 전 사용자 확인"""
-        print("\n✅ 작업이 끝났습니다.")
-        # 바로 꺼지면 아쉬우니까 엔터 누르면 꺼지게 설정
-        input("👉 브라우저를 닫으려면 엔터(Enter) 키를 누르세요...")
-        
-        if self.driver:
-            self.driver.quit()
-            print("👋 브라우저 종료")
+# 유체역학
+with st.expander("3️⃣ 기계유체역학 (열·유체해석 Part 2)"):
+    st.markdown("""
+    - 💧 **[기초 성질: 유체역학 점성/밀도/비중](https://www.youtube.com/results?search_query=유체역학+점성+밀도)**
+    - 🌊 **[베르누이: 베르누이 방정식 문제풀이](https://www.youtube.com/results?search_query=유체역학+베르누이)**
+    - 🚰 **[관로 유동: 관 마찰 손실수두 계산](https://www.youtube.com/results?search_query=유체역학+관마찰+손실)**
+    - 📏 **[차원 해석: 버킹엄 파이 정리](https://www.youtube.com/results?search_query=유체역학+버킹엄+파이)**
+    - ⚙️ **[유체 기계: 펌프/수차/비속도](https://www.youtube.com/results?search_query=유체기계+펌프+수차)**
+    """)
 
-if __name__ == "__main__":
-    # 여기서 검색어를 바꾸세요
-    my_query = "요즘 뜨는 한국 넷플릭스 드라마 추천해줘"
-    
-    bot = GensparkBot()
-    if bot.setup_driver():
-        bot.search(my_query)
+# 기계요소설계
+with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계)"):
+    st.markdown("""
+    - 🔩 **[나사/리벳: 나사 효율 및 리벳 이음](https://www.youtube.com/results?search_query=기계설계+나사+리벳)**
+    - 🔨 **[축 설계: 축 지름 및 강도 계산](https://www.youtube.com/results?search_query=기계설계+축+설계)**
+    - ⚙️ **[기어: 기어 모듈/속도비 계산](https://www.youtube.com/results?search_query=기계설계+기어+계산)**
+    - 🔘 **[베어링: 베어링 수명시간 공식](https://www.youtube.com/results?search_query=기계설계+베어링+수명)**
+    - 🛑 **[브레이크: 브레이크 제동 토크](https://www.youtube.com/results?search_query=기계설계+브레이크)**
+    """)
+
+st.markdown("---")
+
+# 3. 실기 대비 섹션
+st.header("🎯 3. 실기 대비 (필답형 & 작업형)")
+
+with st.container():
+    st.markdown("""
+    - 📝 **[필답형 요약 정리 (공식 암기용)](https://www.youtube.com/results?search_query=일반기계기사+실기+필답형+요약)**
+    - 📝 **[필답형 기출 문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+실기+필답형+기출)**
+    - 💻 **[작업형 인벤터 기초 강의](https://www.youtube.com/results?search_query=일반기계기사+작업형+인벤터+기초)**
+    - 📐 **[작업형 투상(도면해독) 연습](https://www.youtube.com/results?search_query=일반기계기사+작업형+투상)**
+    - 📏 **[작업형 거칠기 & 기하공차 넣는 법](https://www.youtube.com/results?search_query=일반기계기사+거칠기+기하공차)**
+    """)
+
+st.markdown("---")
+st.write("🔥 **일반기계기사 합격을 기원합니다!** Created with Python & Streamlit")
