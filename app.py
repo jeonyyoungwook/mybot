@@ -18,7 +18,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 질문 삭제 버튼 2개 (위 + 아래)
+# [Part 1] Gemini AI 튜터 ✅ Form 방식으로 변경 (삭제 후 재답변 방지)
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -26,32 +26,29 @@ if 'ai_response' not in st.session_state:
     st.session_state.ai_response = None
 if 'model_name' not in st.session_state:
     st.session_state.model_name = None
-if 'user_query' not in st.session_state:
-    st.session_state.user_query = ""
-
-# 질문 삭제 함수
-def clear_query():
-    st.session_state.ai_response = None
-    st.session_state.model_name = None
-    st.session_state.user_query = ""
 
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념(예: 베르누이 방정식, 랭킨 사이클)을 입력하면 AI가 설명해줍니다.")
 
-    # ✅ 질문 입력창 + 위쪽 삭제 버튼
-    col_input, col_btn = st.columns([6, 1])
-    
-    with col_input:
-        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘", label_visibility="collapsed")
-    
-    with col_btn:
-        if st.button("🗑️ 삭제", key="delete_top", use_container_width=True):
-            clear_query()
-            st.rerun()
+    # ✅ Form 사용 - 엔터 또는 버튼 클릭 시에만 실행
+    with st.form(key="question_form", clear_on_submit=True):
+        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+        
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            submit_btn = st.form_submit_button("🔍 질문하기", use_container_width=True)
+        with col2:
+            pass
 
-    if query and query != st.session_state.user_query:
-        st.session_state.user_query = query
+    # ✅ 위쪽 삭제 버튼 (Form 바깥에 배치)
+    if st.button("🗑️ 삭제", key="delete_top"):
+        st.session_state.ai_response = None
+        st.session_state.model_name = None
+        st.rerun()
+
+    # 질문 제출 시에만 AI 호출
+    if submit_btn and query:
         try:
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
@@ -107,7 +104,8 @@ with st.container():
         # ✅ 아래쪽 삭제 버튼
         st.markdown("")
         if st.button("🗑️ 질문 삭제", key="delete_bottom"):
-            clear_query()
+            st.session_state.ai_response = None
+            st.session_state.model_name = None
             st.rerun()
 
 st.divider()
