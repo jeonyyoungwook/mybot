@@ -18,7 +18,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ Secrets에서 API 키 안전하게 불러오기
+# [Part 1] Gemini AI 튜터 ✅ API 버전 문제 해결
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -28,14 +28,21 @@ with st.container():
 
     if query:
         try:
-            # ✅ Streamlit Secrets에서 API 키 안전하게 가져오기
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
+                
+                # ✅ 수정: API 설정 방식 변경
                 genai.configure(api_key=api_key)
                 
                 with st.spinner("AI가 답변을 생성 중입니다..."):
-                    # ✅ 최신 모델로 변경
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # ✅ 수정: 여러 모델 순차 시도
+                    try:
+                        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                    except:
+                        try:
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                        except:
+                            model = genai.GenerativeModel('gemini-pro-latest')
                     
                     response = model.generate_content(query)
                     
