@@ -18,33 +18,34 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 (수정됨)
+# [Part 1] Gemini AI 튜터 (모델명 gemini-3-flash 적용)
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념(예: 베르누이 방정식, 랭킨 사이클)을 입력하면 AI가 설명해줍니다.")
 
-    # 질문 입력창만 표시
+    # 질문 입력창
     query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
 
     if query:
         try:
-            # [수정된 부분] Streamlit Secrets에서 'GOOGLE_API_KEY'라는 이름의 변수를 가져옵니다.
+            # Streamlit Secrets에서 API 키 가져오기
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
-                            
+                genai.configure(api_key=api_key)
+                
                 with st.spinner("AI가 답변을 생성 중입니다..."):
-                    genai.configure(api_key=api_key)
-                    # 무료/고속 모델 사용
-                     model = genai.GenerativeModel('gemini-3-flash')
+                    # ---------------------------------------------------------
+                    # [모델 설정] 요청하신 gemini-3-flash 모델 적용
+                    # ---------------------------------------------------------
+                    model = genai.GenerativeModel('gemini-3-flash')
+                    
                     response = model.generate_content(query)
-                   
-
                     
                     st.success("답변 완료!")
                     st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
             else:
-                st.error("⚠️ API 키 설정이 필요합니다. (Streamlit Cloud의 Secrets 설정을 확인하세요)")
+                st.error("⚠️ API 키 설정이 필요합니다. (Secrets 설정을 확인하세요)")
                 
         except Exception as e:
             st.error(f"에러 발생: {e}")
@@ -111,33 +112,4 @@ with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계) - 펼쳐�
     st.markdown("""
     - [⚙️ **기어/베어링**: 기어 치형과 베어링 수명](https://www.youtube.com/results?search_query=기계요소설계+기어+베어링)
     - [🔩 **나사/볼트**: 나사의 역학 및 효율](https://www.youtube.com/results?search_query=기계요소설계+나사+효율)
-    - [🛡️ **파손 이론**: 각종 파손 이론 정리](https://www.youtube.com/results?search_query=기계설계+파손이론)
-    """)
-
-st.markdown("")
-
-# --------------------------------------------------------------------------------
-# [Part 4] 🎯 3. 실기 대비
-# --------------------------------------------------------------------------------
-st.header("🎯 3. 실기 대비 (필답형 & 작업형)")
-
-col_prac1, col_prac2 = st.columns(2)
-
-with col_prac1:
-    st.subheader("📝 필답형")
-    st.markdown("""
-    - [📖 **필답형 요약 정리** (공식 암기용)](https://www.youtube.com/results?search_query=일반기계기사+필답형+요약)
-    - [✍️ **필답형 기출 문제 풀이**](https://www.youtube.com/results?search_query=일반기계기사+필답형+기출)
-    """)
-
-with col_prac2:
-    st.subheader("💻 작업형 (2D/3D)")
-    st.markdown("""
-    - [🖱️ **작업형 인벤터 기초 강의**](https://www.youtube.com/results?search_query=일반기계기사+인벤터+기초)
-    - [📐 **작업형 투상(도면해독) 연습**](https://www.youtube.com/results?search_query=일반기계기사+투상+연습)
-    - [📏 **거칠기 & 기하공차 넣는 법**](https://www.youtube.com/results?search_query=일반기계기사+거칠기+기하공차)
-    """)
-
-st.divider()
-st.caption("🔥 일반기계기사 합격을 기원합니다! | Created with Python & Streamlit")
-
+    - 
