@@ -18,34 +18,41 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 답변 삭제 기능 추가
+# [Part 1] Gemini AI 튜터 ✅ 질문 삭제 버튼 2개 (위 + 아래)
 # --------------------------------------------------------------------------------
 
-# 세션 스테이트 초기화 (답변 저장용)
+# 세션 스테이트 초기화
 if 'ai_response' not in st.session_state:
     st.session_state.ai_response = None
 if 'model_name' not in st.session_state:
     st.session_state.model_name = None
+if 'user_query' not in st.session_state:
+    st.session_state.user_query = ""
+
+# 질문 삭제 함수
+def clear_query():
+    st.session_state.ai_response = None
+    st.session_state.model_name = None
+    st.session_state.user_query = ""
 
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념(예: 베르누이 방정식, 랭킨 사이클)을 입력하면 AI가 설명해줍니다.")
 
-    col1, col2 = st.columns([5, 1])
+    # ✅ 질문 입력창 + 위쪽 삭제 버튼
+    col_input, col_btn = st.columns([6, 1])
     
-    with col1:
-        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+    with col_input:
+        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘", label_visibility="collapsed")
     
-    with col2:
-        st.write("")  # 버튼 위치 맞추기용
-        if st.button("🗑️ 삭제", use_container_width=True):
-            st.session_state.ai_response = None
-            st.session_state.model_name = None
+    with col_btn:
+        if st.button("🗑️ 삭제", key="delete_top", use_container_width=True):
+            clear_query()
             st.rerun()
 
-    if query:
+    if query and query != st.session_state.user_query:
+        st.session_state.user_query = query
         try:
-            # ✅ Secrets에서만 API 키 가져오기
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
                 genai.configure(api_key=api_key)
@@ -57,7 +64,6 @@ with st.container():
                         if 'generateContent' in m.supported_generation_methods:
                             available_models.append(m.name)
                     
-                    # 우선순위: gemini-1.5 > gemini-1.0
                     model_name = None
                     for model_candidate in available_models:
                         if 'gemini-1.5' in model_candidate:
@@ -71,7 +77,6 @@ with st.container():
                         model = genai.GenerativeModel(model_name)
                         response = model.generate_content(query)
                         
-                        # 세션 스테이트에 답변 저장
                         st.session_state.ai_response = response.text
                         st.session_state.model_name = model_name
                     else:
@@ -91,7 +96,6 @@ with st.container():
                 1. Google AI Studio에서 기존 키 삭제
                 2. 새 API 키 발급
                 3. App Settings > Secrets에 새 키 등록
-                4. 절대 코드에 직접 입력하지 마세요!
                 """)
 
     # ✅ 저장된 답변 표시
@@ -99,6 +103,12 @@ with st.container():
         st.success("답변 완료!")
         st.markdown(f"**💡 AI 답변:**\n\n{st.session_state.ai_response}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
+        
+        # ✅ 아래쪽 삭제 버튼
+        st.markdown("")
+        if st.button("🗑️ 질문 삭제", key="delete_bottom"):
+            clear_query()
+            st.rerun()
 
 st.divider()
 
