@@ -21,47 +21,71 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# ✅ 링크 자동 변환 + 키워드 검색 링크 생성 함수
+# ✅ 유튜브 링크 예쁘게 표시하는 함수
 # --------------------------------------------------------------------------------
+def format_youtube_links(text):
+    """
+    유튜브 링크를 예쁜 카드 형식으로 변환
+    """
+    # 유튜브 링크 패턴
+    youtube_pattern = r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)'
+    
+    def replace_youtube(match):
+        video_id = match.group(1)
+        full_url = match.group(0)
+        
+        # 예쁜 카드 형식으로 변환
+        return f"""
+---
+### 📺 추천 영상
+
+[![YouTube](https://img.youtube.com/vi/{video_id}/mqdefault.jpg)]({full_url})
+
+**🎬 [영상 바로보기 →]({full_url})**
+
+---
+"""
+    
+    # 유튜브 링크를 카드로 변환
+    formatted_text = re.sub(youtube_pattern, replace_youtube, text)
+    
+    return formatted_text
+
 def make_links_clickable(text):
-    """텍스트 내의 URL을 클릭 가능한 Markdown 링크로 변환"""
-    url_pattern = r'(https?://[^\s]+)'
+    """일반 URL을 클릭 가능한 링크로 변환 (유튜브 제외)"""
+    # 유튜브가 아닌 다른 링크만 변환
+    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com)[^\s]+)'
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?)')
-        return f'[🔗 {url}]({url})'
+        return f'[🔗 링크 보기]({url})'
     
     return re.sub(url_pattern, replace_url, text)
 
 def add_youtube_search_links(text):
-    """
-    AI 답변에 유튜브 검색 링크 추가
-    """
-    # 주요 키워드 패턴 찾기
+    """주요 키워드에 유튜브 검색 링크 추가"""
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
         "랭킨 사이클", "오토 사이클", "디젤 사이클",
-        "레이놀즈 수", "기어", "베어링", "나사"
+        "레이놀즈 수", "기어", "베어링", "나사", "에너지 보존"
     ]
     
     modified_text = text
     
     for keyword in keywords:
-        # 키워드가 텍스트에 있으면 검색 링크 추가
         if keyword in modified_text:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
             youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
             
-            # 첫 번째 발견된 키워드에만 링크 추가 (중복 방지)
             pattern = f"({keyword})"
-            replacement = f"\\1 [📺유튜브 검색]({youtube_link})"
+            replacement = f"\\1 [📺]({youtube_link})"
             modified_text = re.sub(pattern, replacement, modified_text, count=1)
     
     return modified_text
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 프롬프트 개선 + 링크 자동 생성
+# [Part 1] Gemini AI 튜터
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -78,7 +102,6 @@ with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념을 텍스트 또는 **이미지(스크린샷, 문제 사진)**로 질문하세요!")
 
-    # ✅ 탭으로 구분: 텍스트 질문 / 이미지 질문
     tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
     
     # ========== 탭 1: 텍스트 질문 ==========
@@ -116,12 +139,17 @@ with st.container():
                         if model_name:
                             model = genai.GenerativeModel(model_name)
                             
-                            # ✅ 프롬프트 개선: 유튜브 검색 키워드 제안 요청
+                            # ✅ 프롬프트 개선: 유튜브 영상 추천 요청
                             enhanced_query = f"""
 {query}
 
-답변 끝에 다음을 추가해주세요:
-- 이 주제를 더 공부하려면 유튜브에서 검색할 만한 키워드 3개 추천
+답변 후 다음을 추가해주세요:
+1. 이 주제와 관련된 **구체적인 유튜브 영상 제목과 채널명** 추천 (있다면 실제 링크도)
+2. 유튜브에서 검색할 만한 키워드 3개
+
+형식:
+- 추천 영상: [채널명] 영상제목
+- 검색 키워드: 키워드1, 키워드2, 키워드3
 """
                             
                             response = model.generate_content(enhanced_query)
@@ -196,9 +224,9 @@ with st.container():
                             image = Image.open(uploaded_file)
                             
                             if image_query:
-                                prompt = f"{image_query}\n\n답변 후 관련 유튜브 검색 키워드 3개도 추천해주세요."
+                                prompt = f"{image_query}\n\n답변 후 관련 유튜브 영상 추천과 검색 키워드도 알려주세요."
                             else:
-                                prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요. 그리고 관련 유튜브 검색 키워드도 추천해주세요."
+                                prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요. 그리고 관련 유튜브 영상과 검색 키워드도 추천해주세요."
                             
                             response = model.generate_content([prompt, image])
                             
@@ -224,18 +252,20 @@ with st.container():
         st.session_state.uploader_key += 1
         st.rerun()
 
-    # ✅ 저장된 답변 표시 (링크 자동 생성)
+    # ✅ 저장된 답변 표시 (유튜브 링크 예쁘게)
     if st.session_state.ai_response:
         st.success("답변 완료!")
         
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", width=400)
         
-        # ✅ URL 링크 변환 + 유튜브 검색 링크 추가
-        clickable_response = make_links_clickable(st.session_state.ai_response)
-        final_response = add_youtube_search_links(clickable_response)
+        # ✅ 링크 변환 순서: 유튜브 카드 → 일반 링크 → 키워드 검색
+        response_text = st.session_state.ai_response
+        response_text = format_youtube_links(response_text)  # 유튜브 → 카드
+        response_text = make_links_clickable(response_text)  # 일반 링크
+        response_text = add_youtube_search_links(response_text)  # 키워드 검색
         
-        st.markdown(f"**💡 AI 답변:**\n\n{final_response}")
+        st.markdown(f"**💡 AI 답변:**\n\n{response_text}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
         
         st.markdown("")
@@ -336,4 +366,4 @@ with col_prac2:
 """)
 
 st.divider()
-st.caption("🔥 일반기계기사 합격을 기원합니다! | Created with Python & Streamlit")
+st.caption("🔥 일반기계기사 합격을 
