@@ -18,7 +18,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ API 버전 문제 해결
+# [Part 1] Gemini AI 튜터 ✅ 사용 가능한 모델 자동 감지
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -30,29 +30,47 @@ with st.container():
         try:
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
-                
-                # ✅ 수정: API 설정 방식 변경
                 genai.configure(api_key=api_key)
                 
                 with st.spinner("AI가 답변을 생성 중입니다..."):
-                    # ✅ 수정: 여러 모델 순차 시도
-                    try:
-                        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                    except:
-                        try:
-                            model = genai.GenerativeModel('gemini-1.5-flash')
-                        except:
-                            model = genai.GenerativeModel('gemini-pro-latest')
+                    # ✅ 해결: 사용 가능한 모델 목록에서 자동 선택
+                    available_models = []
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            available_models.append(m.name)
                     
-                    response = model.generate_content(query)
+                    # 우선순위: gemini-1.5 > gemini-1.0
+                    model_name = None
+                    for model_candidate in available_models:
+                        if 'gemini-1.5-flash' in model_candidate or 'gemini-1.5-pro' in model_candidate:
+                            model_name = model_candidate
+                            break
                     
-                    st.success("답변 완료!")
-                    st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
+                    if not model_name and available_models:
+                        model_name = available_models[0]
+                    
+                    if model_name:
+                        model = genai.GenerativeModel(model_name)
+                        response = model.generate_content(query)
+                        
+                        st.success("답변 완료!")
+                        st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
+                        st.caption(f"사용된 모델: {model_name}")
+                    else:
+                        st.error("사용 가능한 모델을 찾을 수 없습니다.")
             else:
                 st.error("⚠️ API 키 설정이 필요합니다. (App Settings > Secrets 확인)")
                 
         except Exception as e:
             st.error(f"에러 발생: {e}")
+            # 디버깅용: 사용 가능한 모델 출력
+            try:
+                st.warning("사용 가능한 모델 목록:")
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        st.text(f"- {m.name}")
+            except:
+                pass
 
 st.divider()
 
