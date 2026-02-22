@@ -36,8 +36,10 @@ with st.container():
                 with st.spinner("AI가 답변을 생성 중입니다..."):
                     genai.configure(api_key=api_key)
                     # 무료/고속 모델 사용
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                     model = genai.GenerativeModel('gemini-3-flash')
                     response = model.generate_content(query)
+                   
+
                     
                     st.success("답변 완료!")
                     st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
@@ -138,3 +140,4 @@ with col_prac2:
 
 st.divider()
 st.caption("🔥 일반기계기사 합격을 기원합니다! | Created with Python & Streamlit")
+
