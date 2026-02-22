@@ -18,22 +18,40 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 사용 가능한 모델 자동 감지
+# [Part 1] Gemini AI 튜터 ✅ 답변 삭제 기능 추가
 # --------------------------------------------------------------------------------
+
+# 세션 스테이트 초기화 (답변 저장용)
+if 'ai_response' not in st.session_state:
+    st.session_state.ai_response = None
+if 'model_name' not in st.session_state:
+    st.session_state.model_name = None
+
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념(예: 베르누이 방정식, 랭킨 사이클)을 입력하면 AI가 설명해줍니다.")
 
-    query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+    col1, col2 = st.columns([5, 1])
+    
+    with col1:
+        query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+    
+    with col2:
+        st.write("")  # 버튼 위치 맞추기용
+        if st.button("🗑️ 삭제", use_container_width=True):
+            st.session_state.ai_response = None
+            st.session_state.model_name = None
+            st.rerun()
 
     if query:
         try:
+            # ✅ Secrets에서만 API 키 가져오기
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
                 genai.configure(api_key=api_key)
                 
                 with st.spinner("AI가 답변을 생성 중입니다..."):
-                    # ✅ 해결: 사용 가능한 모델 목록에서 자동 선택
+                    # ✅ 사용 가능한 모델 자동 감지
                     available_models = []
                     for m in genai.list_models():
                         if 'generateContent' in m.supported_generation_methods:
@@ -42,7 +60,7 @@ with st.container():
                     # 우선순위: gemini-1.5 > gemini-1.0
                     model_name = None
                     for model_candidate in available_models:
-                        if 'gemini-1.5-flash' in model_candidate or 'gemini-1.5-pro' in model_candidate:
+                        if 'gemini-1.5' in model_candidate:
                             model_name = model_candidate
                             break
                     
@@ -53,24 +71,34 @@ with st.container():
                         model = genai.GenerativeModel(model_name)
                         response = model.generate_content(query)
                         
-                        st.success("답변 완료!")
-                        st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
-                        st.caption(f"사용된 모델: {model_name}")
+                        # 세션 스테이트에 답변 저장
+                        st.session_state.ai_response = response.text
+                        st.session_state.model_name = model_name
                     else:
                         st.error("사용 가능한 모델을 찾을 수 없습니다.")
             else:
-                st.error("⚠️ API 키 설정이 필요합니다. (App Settings > Secrets 확인)")
+                st.error("⚠️ API 키가 설정되지 않았습니다.")
+                st.info("👉 App Settings > Secrets에 GOOGLE_API_KEY를 추가하세요.")
                 
         except Exception as e:
-            st.error(f"에러 발생: {e}")
-            # 디버깅용: 사용 가능한 모델 출력
-            try:
-                st.warning("사용 가능한 모델 목록:")
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        st.text(f"- {m.name}")
-            except:
-                pass
+            st.error(f"❌ 에러 발생: {e}")
+            
+            if "403" in str(e) or "leaked" in str(e):
+                st.warning("""
+                🚨 **API 키가 유출되었습니다!**
+                
+                해결 방법:
+                1. Google AI Studio에서 기존 키 삭제
+                2. 새 API 키 발급
+                3. App Settings > Secrets에 새 키 등록
+                4. 절대 코드에 직접 입력하지 마세요!
+                """)
+
+    # ✅ 저장된 답변 표시
+    if st.session_state.ai_response:
+        st.success("답변 완료!")
+        st.markdown(f"**💡 AI 답변:**\n\n{st.session_state.ai_response}")
+        st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
 
 st.divider()
 
