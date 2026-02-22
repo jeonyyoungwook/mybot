@@ -18,7 +18,7 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 (표준 모델 gemini-pro 적용)
+# [Part 1] Gemini AI 튜터 ✅ Secrets에서 API 키 안전하게 불러오기
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -28,24 +28,21 @@ with st.container():
 
     if query:
         try:
+            # ✅ Streamlit Secrets에서 API 키 안전하게 가져오기
             if "GOOGLE_API_KEY" in st.secrets:
                 api_key = st.secrets["GOOGLE_API_KEY"]
                 genai.configure(api_key=api_key)
                 
                 with st.spinner("AI가 답변을 생성 중입니다..."):
-                    # ---------------------------------------------------------
-                    # [긴급 수정] 1.5 버전 인식이 안 될 때 해결법
-                    # 가장 안정적인 'gemini-pro' (1.0 버전)을 사용합니다.
-                    # 이 모델은 어떤 환경에서도 오류 없이 작동합니다.
-                    # ---------------------------------------------------------
-                    model = genai.GenerativeModel('gemini-pro')
+                    # ✅ 최신 모델로 변경
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     response = model.generate_content(query)
                     
                     st.success("답변 완료!")
                     st.markdown(f"**💡 AI 답변:**\n\n{response.text}")
             else:
-                st.error("⚠️ API 키 설정이 필요합니다. (Secrets 설정을 확인하세요)")
+                st.error("⚠️ API 키 설정이 필요합니다. (App Settings > Secrets 확인)")
                 
         except Exception as e:
             st.error(f"에러 발생: {e}")
