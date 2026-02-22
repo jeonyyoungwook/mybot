@@ -6,7 +6,7 @@ import urllib.parse
 
 # 1. 페이지 기본 설정
 st.set_page_config(
-    page_title="일반기계기사 학습 가이드",
+    page_title="일반기계기사 설매와 함께하는 학습 가이드",
     page_icon="⚙️",
     layout="wide"
 )
@@ -528,3 +528,4 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
+
