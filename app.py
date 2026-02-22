@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import re
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -19,7 +20,28 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 이미지 삭제 버튼 추가
+# ✅ 링크 자동 변환 함수
+# --------------------------------------------------------------------------------
+def make_links_clickable(text):
+    """
+    텍스트 내의 URL을 Markdown 링크로 변환
+    """
+    # URL 패턴 찾기
+    url_pattern = r'(https?://[^\s]+)'
+    
+    def replace_url(match):
+        url = match.group(1)
+        # 특수문자 제거 (마침표, 괄호 등이 URL 끝에 붙는 경우)
+        url = url.rstrip('.,;:!?)')
+        return f'[🔗 {url}]({url})'
+    
+    # URL을 클릭 가능한 링크로 변환
+    text_with_links = re.sub(url_pattern, replace_url, text)
+    
+    return text_with_links
+
+# --------------------------------------------------------------------------------
+# [Part 1] Gemini AI 튜터 ✅ 링크 자동 변환 기능 추가
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -30,7 +52,7 @@ if 'model_name' not in st.session_state:
 if 'uploaded_image' not in st.session_state:
     st.session_state.uploaded_image = None
 if 'uploader_key' not in st.session_state:
-    st.session_state.uploader_key = 0  # ✅ 이미지 업로더 리셋용 키
+    st.session_state.uploader_key = 0
 
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -90,7 +112,7 @@ with st.container():
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
-        # ✅ 이미지 업로더 (동적 key 사용으로 리셋 가능)
+        # ✅ 이미지 업로더
         uploaded_file = st.file_uploader(
             "이미지 업로드 (JPG, PNG)", 
             type=['jpg', 'jpeg', 'png'],
@@ -103,9 +125,8 @@ with st.container():
             image = Image.open(uploaded_file)
             st.image(image, caption="업로드된 이미지", use_container_width=True)
             
-            # ✅ 이미지 삭제 버튼
             if st.button("🖼️ 이미지 삭제", key="delete_image"):
-                st.session_state.uploader_key += 1  # key 변경으로 업로더 리셋
+                st.session_state.uploader_key += 1
                 st.session_state.uploaded_image = None
                 st.rerun()
         
@@ -167,32 +188,34 @@ with st.container():
                 if "403" in str(e):
                     st.warning("API 키가 유출되었거나 만료되었습니다. 새로운 키를 발급받으세요.")
 
-    # ✅ 위쪽 삭제 버튼 (질문 + 이미지 모두 삭제)
+    # ✅ 위쪽 삭제 버튼
     st.markdown("")
     if st.button("🗑️ 전체 삭제", key="delete_top"):
         st.session_state.ai_response = None
         st.session_state.model_name = None
         st.session_state.uploaded_image = None
-        st.session_state.uploader_key += 1  # 이미지 업로더도 리셋
+        st.session_state.uploader_key += 1
         st.rerun()
 
-    # ✅ 저장된 답변 표시
+    # ✅ 저장된 답변 표시 (링크 클릭 가능하게 변환)
     if st.session_state.ai_response:
         st.success("답변 완료!")
         
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", width=400)
         
-        st.markdown(f"**💡 AI 답변:**\n\n{st.session_state.ai_response}")
+        # ✅ 링크를 클릭 가능하게 변환
+        clickable_response = make_links_clickable(st.session_state.ai_response)
+        
+        st.markdown(f"**💡 AI 답변:**\n\n{clickable_response}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
         
-        # ✅ 아래쪽 삭제 버튼 (질문 + 이미지 모두 삭제)
         st.markdown("")
         if st.button("🗑️ 질문 삭제", key="delete_bottom"):
             st.session_state.ai_response = None
             st.session_state.model_name = None
             st.session_state.uploaded_image = None
-            st.session_state.uploader_key += 1  # 이미지 업로더도 리셋
+            st.session_state.uploader_key += 1
             st.rerun()
 
 st.divider()
