@@ -3,6 +3,12 @@ import google.generativeai as genai
 from PIL import Image
 import re
 import urllib.parse
+import asyncio
+import edge_tts
+import io
+import base64
+from pathlib import Path
+import tempfile
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -10,6 +16,102 @@ st.set_page_config(
     page_icon="⚙️",
     layout="wide"
 )
+
+# ========== 🎤 TTS 기능 추가 ==========
+async def text_to_speech_async(text, voice="ko-KR-SunHiNeural"):
+    """
+    Edge TTS로 한국어 음성 생성 (비동기)
+    voice 옵션:
+    - ko-KR-SunHiNeural: 여자 목소리 (부드럽고 자연스러움)
+    - ko-KR-InJoonNeural: 남자 목소리 (차분하고 명확함)
+    """
+    communicate = edge_tts.Communicate(text, voice)
+    
+    # 메모리에 저장
+    audio_data = io.BytesIO()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_data.write(chunk["data"])
+    
+    audio_data.seek(0)
+    return audio_data.getvalue()
+
+def text_to_speech(text, voice="ko-KR-SunHiNeural"):
+    """
+    동기 래퍼 함수
+    """
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        audio_bytes = loop.run_until_complete(text_to_speech_async(text, voice))
+        loop.close()
+        return audio_bytes
+    except Exception as e:
+        st.error(f"음성 생성 실패: {e}")
+        return None
+
+def create_audio_player(audio_bytes):
+    """
+    HTML5 오디오 플레이어 생성
+    """
+    audio_base64 = base64.b64encode(audio_bytes).decode()
+    audio_html = f"""
+    <audio controls autoplay style="width: 100%;">
+        <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+        브라우저가 오디오를 지원하지 않습니다.
+    </audio>
+    """
+    return audio_html
+
+def clean_text_for_tts(text):
+    """
+    TTS용 텍스트 정제 (마크다운 제거, 특수문자 처리)
+    """
+    # 마크다운 링크 제거 [텍스트](url) -> 텍스트
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    
+    # HTML 태그 제거
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # 마크다운 강조 제거 (**, __, ~~)
+    text = re.sub(r'[*_~`]+', '', text)
+    
+    # 헤딩 마크 제거 (###, ##, #)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    
+    # 이모지 제거 또는 설명으로 변환
+    emoji_map = {
+        '✅': '체크',
+        '❌': '주의',
+        '⚠️': '경고',
+        '💡': '팁',
+        '📺': '영상',
+        '🔍': '검색',
+        '📝': '노트',
+        '🎯': '목표',
+        '🔥': '중요',
+        '📚': '학습',
+        '⚙️': '기계',
+        '🎬': '동영상'
+    }
+    
+    for emoji, desc in emoji_map.items():
+        text = text.replace(emoji, f' {desc} ')
+    
+    # 남은 이모지 제거
+    text = re.sub(r'[\U0001F300-\U0001F9FF]', '', text)
+    
+    # 연속 공백 제거
+    text = re.sub(r'\s+', ' ', text)
+    
+    # 너무 긴 텍스트는 앞부분만 (TTS 제한 고려)
+    max_length = 3000  # Edge TTS 권장 최대 길이
+    if len(text) > max_length:
+        text = text[:max_length] + "... 이하 생략됩니다."
+    
+    return text.strip()
+
+# ========== 기존 코드 (유지) ==========
 
 # 2. 제목 및 소개
 st.title("⚙️ 일반기계기사 독학 가이드 🎬")
@@ -21,14 +123,8 @@ st.markdown("""
 
 st.divider()
 
-# --------------------------------------------------------------------------------
-# ✅ 유튜브 링크 예쁘게 표시하는 함수
-# --------------------------------------------------------------------------------
+# 기존 함수들 (그대로 유지)
 def format_youtube_links(text):
-    """
-    유튜브 링크를 예쁜 카드 형식으로 변환
-    """
-    # 유튜브 링크 패턴 (watch, shorts, youtu.be 모두 지원)
     youtube_patterns = [
         r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
         r'https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)',
@@ -39,7 +135,6 @@ def format_youtube_links(text):
         video_id = match.group(1)
         full_url = match.group(0)
         
-        # 예쁜 카드 형식으로 변환
         return f"""
 <div style="border: 2px solid #ff0000; border-radius: 10px; padding: 15px; margin: 10px 0; background-color: #fff5f5;">
     <h4 style="color: #ff0000; margin-top: 0;">📺 추천 영상</h4>
@@ -59,8 +154,6 @@ def format_youtube_links(text):
     return formatted_text
 
 def make_links_clickable(text):
-    """일반 URL을 클릭 가능한 링크로 변환 (유튜브 제외)"""
-    # 유튜브가 아닌 다른 링크만 변환
     url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be)[^\s\)]+)'
     
     def replace_url(match):
@@ -70,12 +163,6 @@ def make_links_clickable(text):
     return re.sub(url_pattern, replace_url, text)
 
 def add_youtube_search_links(text):
-    """
-    주요 키워드와 채널명을 유튜브 검색 링크로 자동 변환
-    - 기존 마크다운 링크는 보호
-    - AI 답변의 채널명, 영상 제목도 자동 링크화
-    """
-    # 기술 키워드
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
@@ -84,20 +171,16 @@ def add_youtube_search_links(text):
         "응력", "변형률", "전단력", "굽힘모멘트"
     ]
     
-    # 유명 채널명 추가
     channel_names = [
         "홍교수", "기계의신", "기계달인", "에듀윌", "메가파이", 
         "한솔아카데미", "공밀레", "Learn Engineering"
     ]
     
-    # 전체 키워드 목록
     all_keywords = keywords + channel_names
     
-    # 먼저 기존 마크다운 링크를 임시 플레이스홀더로 보호
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
     links_found = re.findall(link_pattern, text)
     
-    # 링크를 플레이스홀더로 교체
     protected_text = text
     placeholders = []
     for i, (link_text, link_url) in enumerate(links_found):
@@ -106,7 +189,6 @@ def add_youtube_search_links(text):
         protected_text = protected_text.replace(original, placeholder, 1)
         placeholders.append((placeholder, original))
     
-    # 키워드에 유튜브 링크 추가
     modified_text = protected_text
     used_keywords = set()
     
@@ -115,7 +197,6 @@ def add_youtube_search_links(text):
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
             youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
             
-            # 단어 경계로 정확히 매칭
             pattern = rf'\b({re.escape(keyword)})\b'
             
             if re.search(pattern, modified_text):
@@ -123,7 +204,6 @@ def add_youtube_search_links(text):
                 modified_text = re.sub(pattern, replacement, modified_text, count=1)
                 used_keywords.add(keyword)
     
-    # ✅ 추가: "채널명:" 패턴 감지 및 자동 링크
     channel_pattern = r'채널명:\s*([가-힣a-zA-Z\s]+?)(?=\n|$|특징)'
     
     def replace_channel(match):
@@ -134,7 +214,6 @@ def add_youtube_search_links(text):
     
     modified_text = re.sub(channel_pattern, replace_channel, modified_text)
     
-    # ✅ 추가: "추천 영상:" 또는 "추천 영상 제목:" 패턴 감지
     video_pattern = r'추천 영상(?:\s*제목)?:\s*[""""]([^""""\n]+)[""""]'
     
     def replace_video(match):
@@ -145,26 +224,18 @@ def add_youtube_search_links(text):
     
     modified_text = re.sub(video_pattern, replace_video, modified_text)
     
-    # 플레이스홀더를 원래 링크로 복원
     for placeholder, original in placeholders:
         modified_text = modified_text.replace(placeholder, original)
     
     return modified_text
 
-# --------------------------------------------------------------------------------
-# ✅ 모델 선택 함수
-# --------------------------------------------------------------------------------
 def get_best_gemini_model():
-    """
-    사용 가능한 최신 Gemini 모델을 우선순위에 따라 선택
-    """
     try:
         available_models = []
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        # 우선순위: Gemini 3 > Gemini 2.5 > Gemini 2.0 > Gemini 1.5
         priority_order = [
             'gemini-3',
             'gemini-2.5',
@@ -178,7 +249,6 @@ def get_best_gemini_model():
                 if priority in model_name.lower():
                     return model_name
         
-        # 우선순위에 없으면 첫 번째 사용 가능 모델 반환
         if available_models:
             return available_models[0]
         
@@ -189,9 +259,6 @@ def get_best_gemini_model():
         return None
 
 def get_model_display_name(model_name):
-    """
-    모델 이름을 사용자 친화적으로 변환
-    """
     if not model_name:
         return "알 수 없음"
     
@@ -209,10 +276,6 @@ def get_model_display_name(model_name):
     
     return model_name
 
-# --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터
-# --------------------------------------------------------------------------------
-
 # 세션 스테이트 초기화
 if 'ai_response' not in st.session_state:
     st.session_state.ai_response = None
@@ -222,14 +285,19 @@ if 'uploaded_image' not in st.session_state:
     st.session_state.uploaded_image = None
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = 0
+if 'audio_playing' not in st.session_state:
+    st.session_state.audio_playing = False
+if 'selected_voice' not in st.session_state:
+    st.session_state.selected_voice = "ko-KR-SunHiNeural"
 
+# ========== AI 튜터 섹션 ==========
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념을 텍스트 또는 **이미지(스크린샷, 문제 사진)**로 질문하세요!")
 
     tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
     
-    # ========== 탭 1: 텍스트 질문 ==========
+    # 텍스트 질문 탭
     with tab1:
         with st.form(key="text_question_form", clear_on_submit=True):
             query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
@@ -252,7 +320,6 @@ with st.container():
                         if model_name:
                             model = genai.GenerativeModel(model_name)
                             
-                            # ✅ 프롬프트 개선: 채널명과 영상 제목을 명확히 요청
                             enhanced_query = f"""
 다음 질문에 대해 일반기계기사 시험 준비생 관점에서 친절하게 답변해주세요:
 
@@ -290,7 +357,7 @@ with st.container():
                 elif "403" in str(e):
                     st.warning("🔑 API 키가 유효하지 않습니다. 새로운 키를 발급받으세요.")
     
-    # ========== 탭 2: 이미지 질문 ==========
+    # 이미지 질문 탭
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
@@ -377,36 +444,82 @@ with st.container():
                 elif "403" in str(e):
                     st.warning("🔑 API 키가 유효하지 않습니다.")
 
-    # ✅ 위쪽 삭제 버튼
+    # ✅ 답변 표시 + TTS 기능
     st.markdown("")
     if st.session_state.ai_response:
-        if st.button("🗑️ 답변 삭제", key="delete_top"):
-            st.session_state.ai_response = None
-            st.session_state.model_name = None
-            st.session_state.uploaded_image = None
-            st.session_state.uploader_key += 1
-            st.rerun()
-
-    # ✅ 저장된 답변 표시 (유튜브 링크 예쁘게)
-    if st.session_state.ai_response:
-        st.success("✅ 답변 완료!")
+        # 상단 컨트롤 버튼
+        col_del, col_voice, col_tts = st.columns([1, 2, 2])
         
+        with col_del:
+            if st.button("🗑️ 답변 삭제", key="delete_top", use_container_width=True):
+                st.session_state.ai_response = None
+                st.session_state.model_name = None
+                st.session_state.uploaded_image = None
+                st.session_state.uploader_key += 1
+                st.session_state.audio_playing = False
+                st.rerun()
+        
+        with col_voice:
+            voice_option = st.selectbox(
+                "🎙️ 목소리 선택",
+                options=[
+                    ("ko-KR-SunHiNeural", "👩 여자 목소리 (부드러움)"),
+                    ("ko-KR-InJoonNeural", "👨 남자 목소리 (차분함)")
+                ],
+                format_func=lambda x: x[1],
+                key="voice_selector"
+            )
+            st.session_state.selected_voice = voice_option[0]
+        
+        with col_tts:
+            if st.button("🔊 음성으로 듣기", key="tts_button", use_container_width=True):
+                with st.spinner("🎤 음성을 생성하는 중..."):
+                    # TTS용 텍스트 정제
+                    clean_text = clean_text_for_tts(st.session_state.ai_response)
+                    
+                    # 음성 생성
+                    audio_bytes = text_to_speech(clean_text, st.session_state.selected_voice)
+                    
+                    if audio_bytes:
+                        st.session_state.audio_playing = True
+                        st.success("✅ 음성이 준비되었습니다!")
+        
+        # 오디오 플레이어 표시
+        if st.session_state.audio_playing:
+            st.markdown("---")
+            st.markdown("### 🎧 음성 재생")
+            
+            # 음성 재생
+            clean_text = clean_text_for_tts(st.session_state.ai_response)
+            audio_bytes = text_to_speech(clean_text, st.session_state.selected_voice)
+            
+            if audio_bytes:
+                audio_html = create_audio_player(audio_bytes)
+                st.markdown(audio_html, unsafe_allow_html=True)
+                
+                if st.button("⏹️ 음성 정지", key="stop_audio"):
+                    st.session_state.audio_playing = False
+                    st.rerun()
+            
+            st.markdown("---")
+        
+        # 업로드된 이미지 표시
         if st.session_state.uploaded_image:
             col_img, col_space = st.columns([1, 2])
             with col_img:
                 st.image(st.session_state.uploaded_image, caption="질문한 이미지", use_column_width=True)
         
-        # ✅ 링크 변환 순서: 유튜브 카드 → 키워드 검색 → 일반 링크
+        # AI 답변 표시
         response_text = st.session_state.ai_response
-        response_text = format_youtube_links(response_text)  # 유튜브 → 카드
-        response_text = add_youtube_search_links(response_text)  # 키워드 + 채널명 + 영상 제목 자동 링크
-        response_text = make_links_clickable(response_text)  # 일반 링크
+        response_text = format_youtube_links(response_text)
+        response_text = add_youtube_search_links(response_text)
+        response_text = make_links_clickable(response_text)
         
         st.markdown("---")
         st.markdown("### 💡 AI 답변")
         st.markdown(response_text, unsafe_allow_html=True)
         
-        # ✅ 모델 정보 표시 개선
+        # 모델 정보
         display_name = get_model_display_name(st.session_state.model_name)
         
         with st.expander("🤖 사용된 AI 모델 정보", expanded=False):
@@ -423,13 +536,12 @@ with st.container():
                 - ✅ 텍스트 생성
                 - ✅ 이미지 분석 (Vision)
                 - ✅ 멀티모달 처리
+                - ✅ 음성 출력 (TTS)
                 """)
 
 st.divider()
 
-# --------------------------------------------------------------------------------
-# [Part 2] 📺 1. 추천 유튜브 채널
-# --------------------------------------------------------------------------------
+# ========== 나머지 기존 코드 (유튜브 채널, 과목별 강의 등) ==========
 st.header("📺 1. 추천 유튜브 채널")
 st.caption("채널명을 클릭하면 해당 채널의 영상 목록으로 이동합니다.")
 
@@ -448,12 +560,8 @@ with col_ch5:
 
 st.markdown("")
 
-# --------------------------------------------------------------------------------
-# [Part 3] 🔍 2. 과목별 핵심 강의
-# --------------------------------------------------------------------------------
 st.header("🔍 2. 과목별 핵심 강의")
 
-# 1️⃣ 재료역학
 with st.expander("1️⃣ 재료역학 (기계구조해석) - 펼쳐보기", expanded=False):
     st.markdown("""
 - [🧱 **기초/입문**: 재료역학 기초 강의 보기](https://www.youtube.com/results?search_query=재료역학+기초+강의)
@@ -464,7 +572,6 @@ with st.expander("1️⃣ 재료역학 (기계구조해석) - 펼쳐보기", exp
 - [📝 **기출문제**: 재료역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기출문제)
 """)
 
-# 2️⃣ 기계열역학
 with st.expander("2️⃣ 기계열역학 (열·유체해석 Part 1) - 펼쳐보기"):
     st.markdown("""
 - [🔥 **기초 개념**: 열역학 0,1,2법칙](https://www.youtube.com/results?search_query=열역학+법칙+설명)
@@ -474,7 +581,6 @@ with st.expander("2️⃣ 기계열역학 (열·유체해석 Part 1) - 펼쳐보
 - [📝 **기출문제**: 열역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+열역학+기출)
 """)
 
-# 3️⃣ 기계유체역학
 with st.expander("3️⃣ 기계유체역학 (열·유체해석 Part 2) - 펼쳐보기"):
     st.markdown("""
 - [💧 **유체 성질**: 점성계수와 단위 변환](https://www.youtube.com/results?search_query=유체역학+점성계수)
@@ -484,7 +590,6 @@ with st.expander("3️⃣ 기계유체역학 (열·유체해석 Part 2) - 펼쳐
 - [📝 **기출문제**: 유체역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+유체역학+기출)
 """)
 
-# 4️⃣ 기계요소설계
 with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계) - 펼쳐보기"):
     st.markdown("""
 - [⚙️ **기어/베어링**: 기어 치형과 베어링 수명](https://www.youtube.com/results?search_query=기계요소설계+기어+베어링)
@@ -496,9 +601,6 @@ with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계) - 펼쳐�
 
 st.markdown("")
 
-# --------------------------------------------------------------------------------
-# [Part 4] 🎯 3. 실기 대비
-# --------------------------------------------------------------------------------
 st.header("🎯 3. 실기 대비 (필답형 & 작업형)")
 
 col_prac1, col_prac2 = st.columns(2)
@@ -522,9 +624,6 @@ with col_prac2:
 
 st.divider()
 
-# --------------------------------------------------------------------------------
-# [Part 5] 📚 4. 학습 팁 & 자료
-# --------------------------------------------------------------------------------
 st.header("📚 4. 학습 팁 & 추가 자료")
 
 with st.expander("💡 효율적인 학습 방법", expanded=False):
@@ -556,16 +655,13 @@ with st.expander("📖 추천 교재 & 사이트", expanded=False):
 
 st.divider()
 
-# --------------------------------------------------------------------------------
-# 푸터
-# --------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
     <p>🔥 <strong>일반기계기사 합격을 응원합니다!</strong> 🔥</p>
-    <p style='font-size: 0.9em;'>💡 TIP: AI 튜터에게 모르는 부분을 바로 질문하세요!</p>
+    <p style='font-size: 0.9em;'>💡 TIP: AI 튜터에게 모르는 부분을 바로 질문하고 음성으로도 들어보세요!</p>
     <p style='font-size: 0.8em; margin-top: 10px;'>
-        Made with ❤️ by Streamlit | Powered by Google Gemini AI
+        Made with ❤️ by Streamlit | Powered by Google Gemini AI + Edge TTS
     </p>
 </div>
 """, unsafe_allow_html=True)
