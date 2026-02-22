@@ -6,7 +6,7 @@ import urllib.parse
 
 # 1. 페이지 기본 설정
 st.set_page_config(
-    page_title="일반기계기사 설매와 함께하는 학습 가이드",
+    page_title="일반기계기사 학습 가이드",
     page_icon="⚙️",
     layout="wide"
 )
@@ -14,6 +14,7 @@ st.set_page_config(
 # 2. 제목 및 소개
 st.title("⚙️ 일반기계기사 독학 가이드 🎬")
 st.markdown("""
+영욱이와 설매의 합격을 기원합니다.
 유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다. 
 주제를 클릭하면 **유튜브 검색 결과**로 바로 연결됩니다.
 """)
@@ -70,10 +71,11 @@ def make_links_clickable(text):
 
 def add_youtube_search_links(text):
     """
-    주요 키워드에 유튜브 검색 링크 추가
-    - 이미 링크 형식 [...](...)  안에 있는 텍스트는 제외
-    - AI 답변의 일반 텍스트에만 적용
+    주요 키워드와 채널명을 유튜브 검색 링크로 자동 변환
+    - 기존 마크다운 링크는 보호
+    - AI 답변의 채널명, 영상 제목도 자동 링크화
     """
+    # 기술 키워드
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
@@ -81,6 +83,15 @@ def add_youtube_search_links(text):
         "레이놀즈 수", "기어", "베어링", "나사", "에너지 보존",
         "응력", "변형률", "전단력", "굽힘모멘트"
     ]
+    
+    # 유명 채널명 추가
+    channel_names = [
+        "홍교수", "기계의신", "기계달인", "에듀윌", "메가파이", 
+        "한솔아카데미", "공밀레", "Learn Engineering"
+    ]
+    
+    # 전체 키워드 목록
+    all_keywords = keywords + channel_names
     
     # 먼저 기존 마크다운 링크를 임시 플레이스홀더로 보호
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
@@ -99,7 +110,7 @@ def add_youtube_search_links(text):
     modified_text = protected_text
     used_keywords = set()
     
-    for keyword in keywords:
+    for keyword in all_keywords:
         if keyword in modified_text and keyword not in used_keywords:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
             youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
@@ -111,6 +122,28 @@ def add_youtube_search_links(text):
                 replacement = f'[\\1 📺]({youtube_link})'
                 modified_text = re.sub(pattern, replacement, modified_text, count=1)
                 used_keywords.add(keyword)
+    
+    # ✅ 추가: "채널명:" 패턴 감지 및 자동 링크
+    channel_pattern = r'채널명:\s*([가-힣a-zA-Z\s]+?)(?=\n|$|특징)'
+    
+    def replace_channel(match):
+        channel_name = match.group(1).strip()
+        search_query = urllib.parse.quote(f"{channel_name} 일반기계기사")
+        youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
+        return f'채널명: [{channel_name} 📺]({youtube_link})'
+    
+    modified_text = re.sub(channel_pattern, replace_channel, modified_text)
+    
+    # ✅ 추가: "추천 영상:" 또는 "추천 영상 제목:" 패턴 감지
+    video_pattern = r'추천 영상(?:\s*제목)?:\s*[""""]([^""""\n]+)[""""]'
+    
+    def replace_video(match):
+        video_title = match.group(1).strip()
+        search_query = urllib.parse.quote(video_title)
+        youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
+        return f'추천 영상: ["{video_title}" 🎬]({youtube_link})'
+    
+    modified_text = re.sub(video_pattern, replace_video, modified_text)
     
     # 플레이스홀더를 원래 링크로 복원
     for placeholder, original in placeholders:
@@ -219,7 +252,7 @@ with st.container():
                         if model_name:
                             model = genai.GenerativeModel(model_name)
                             
-                            # ✅ 프롬프트 개선: 유튜브 영상 추천 요청
+                            # ✅ 프롬프트 개선: 채널명과 영상 제목을 명확히 요청
                             enhanced_query = f"""
 다음 질문에 대해 일반기계기사 시험 준비생 관점에서 친절하게 답변해주세요:
 
@@ -229,9 +262,15 @@ with st.container():
 1. 핵심 개념 설명 (이해하기 쉽게)
 2. 공식이나 계산 방법 (있다면)
 3. 시험 출제 경향 및 주의사항
-4. 추천 학습 자료:
-   - 유튜브 검색 키워드 3개 (구체적으로)
-   - 관련 영상이 있다면 채널명과 제목
+4. 📺 추천 채널 및 영상 (아래 형식으로):
+   
+   **채널명:** 홍교수
+   **특징:** 간결한 설명
+   **추천 영상:** "열역학 1법칙 완벽 정리"
+   
+   (이런 식으로 2-3개 채널 추천)
+
+5. 유튜브 검색 키워드 3개
 """
                             
                             response = model.generate_content(enhanced_query)
@@ -306,7 +345,8 @@ with st.container():
 1. 이미지에 보이는 핵심 내용 설명
 2. 문제라면 단계별 풀이 과정
 3. 관련 개념 및 공식
-4. 유튜브 검색 키워드 추천
+4. 📺 추천 유튜브 채널 및 영상 (채널명과 영상 제목 포함)
+5. 검색 키워드
 """
                             else:
                                 prompt = """
@@ -316,7 +356,8 @@ with st.container():
 1. 이미지에 포함된 내용 (문제, 도면, 공식 등)
 2. 관련 개념 설명
 3. 문제라면 풀이 과정
-4. 학습에 도움이 될 유튜브 검색 키워드
+4. 📺 추천 유튜브 채널 및 영상
+5. 검색 키워드
 """
                             
                             response = model.generate_content([prompt, image])
@@ -358,7 +399,7 @@ with st.container():
         # ✅ 링크 변환 순서: 유튜브 카드 → 키워드 검색 → 일반 링크
         response_text = st.session_state.ai_response
         response_text = format_youtube_links(response_text)  # 유튜브 → 카드
-        response_text = add_youtube_search_links(response_text)  # 키워드 검색 (안전하게)
+        response_text = add_youtube_search_links(response_text)  # 키워드 + 채널명 + 영상 제목 자동 링크
         response_text = make_links_clickable(response_text)  # 일반 링크
         
         st.markdown("---")
@@ -528,4 +569,3 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
-
