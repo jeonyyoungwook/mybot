@@ -18,7 +18,7 @@ st.markdown("""
 st.divider() # 구분선
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 (에러 수정된 버전)
+# [Part 1] Gemini AI 튜터 (일반 무료 버전 적용)
 # --------------------------------------------------------------------------------
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
@@ -28,6 +28,7 @@ with st.container():
     
     with col1:
         with st.expander("🔑 Google API 키 입력", expanded=False):
+            # API 키 입력창
             api_key = st.text_input("API Key", type="password", key="api_key_input")
             st.markdown("[키 발급받기](https://aistudio.google.com/app/apikey)")
 
@@ -41,8 +42,10 @@ with st.container():
             try:
                 with st.spinner("AI가 답변을 생성 중입니다..."):
                     genai.configure(api_key=api_key)
-                    # 모델 설정 코드 (이전 에러 수정됨)
-                    model = genai.GenerativeModel('gemini-pro')
+                    
+                    # [수정됨] 가장 일반적이고 빠른 무료 모델 (Flash) 사용
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    
                     response = model.generate_content(query)
                     
                     st.success("답변 완료!")
@@ -75,7 +78,7 @@ with col_ch5:
 st.markdown("") # 여백
 
 # --------------------------------------------------------------------------------
-# [Part 3] 🔍 2. 과목별 핵심 강의 (요청하신 내용 반영)
+# [Part 3] 🔍 2. 과목별 핵심 강의
 # --------------------------------------------------------------------------------
 st.header("🔍 2. 과목별 핵심 강의")
 st.caption("각 항목을 클릭하면 관련 유튜브 강의 검색 결과가 새 창에서 열립니다.")
