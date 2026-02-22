@@ -1,0 +1,11 @@
+# Streamlit secrets (API 키 보호)
+.streamlit/secrets.toml
+
+# Python 관련
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# 기타
+.DS_Store
