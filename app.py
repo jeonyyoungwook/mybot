@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import re
+import urllib.parse
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -20,28 +21,47 @@ st.markdown("""
 st.divider()
 
 # --------------------------------------------------------------------------------
-# ✅ 링크 자동 변환 함수
+# ✅ 링크 자동 변환 + 키워드 검색 링크 생성 함수
 # --------------------------------------------------------------------------------
 def make_links_clickable(text):
-    """
-    텍스트 내의 URL을 Markdown 링크로 변환
-    """
-    # URL 패턴 찾기
+    """텍스트 내의 URL을 클릭 가능한 Markdown 링크로 변환"""
     url_pattern = r'(https?://[^\s]+)'
     
     def replace_url(match):
-        url = match.group(1)
-        # 특수문자 제거 (마침표, 괄호 등이 URL 끝에 붙는 경우)
-        url = url.rstrip('.,;:!?)')
+        url = match.group(1).rstrip('.,;:!?)')
         return f'[🔗 {url}]({url})'
     
-    # URL을 클릭 가능한 링크로 변환
-    text_with_links = re.sub(url_pattern, replace_url, text)
+    return re.sub(url_pattern, replace_url, text)
+
+def add_youtube_search_links(text):
+    """
+    AI 답변에 유튜브 검색 링크 추가
+    """
+    # 주요 키워드 패턴 찾기
+    keywords = [
+        "재료역학", "열역학", "유체역학", "기계요소설계",
+        "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
+        "랭킨 사이클", "오토 사이클", "디젤 사이클",
+        "레이놀즈 수", "기어", "베어링", "나사"
+    ]
     
-    return text_with_links
+    modified_text = text
+    
+    for keyword in keywords:
+        # 키워드가 텍스트에 있으면 검색 링크 추가
+        if keyword in modified_text:
+            search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
+            youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
+            
+            # 첫 번째 발견된 키워드에만 링크 추가 (중복 방지)
+            pattern = f"({keyword})"
+            replacement = f"\\1 [📺유튜브 검색]({youtube_link})"
+            modified_text = re.sub(pattern, replacement, modified_text, count=1)
+    
+    return modified_text
 
 # --------------------------------------------------------------------------------
-# [Part 1] Gemini AI 튜터 ✅ 링크 자동 변환 기능 추가
+# [Part 1] Gemini AI 튜터 ✅ 프롬프트 개선 + 링크 자동 생성
 # --------------------------------------------------------------------------------
 
 # 세션 스테이트 초기화
@@ -95,7 +115,16 @@ with st.container():
                         
                         if model_name:
                             model = genai.GenerativeModel(model_name)
-                            response = model.generate_content(query)
+                            
+                            # ✅ 프롬프트 개선: 유튜브 검색 키워드 제안 요청
+                            enhanced_query = f"""
+{query}
+
+답변 끝에 다음을 추가해주세요:
+- 이 주제를 더 공부하려면 유튜브에서 검색할 만한 키워드 3개 추천
+"""
+                            
+                            response = model.generate_content(enhanced_query)
                             
                             st.session_state.ai_response = response.text
                             st.session_state.model_name = model_name
@@ -112,7 +141,6 @@ with st.container():
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
-        # ✅ 이미지 업로더
         uploaded_file = st.file_uploader(
             "이미지 업로드 (JPG, PNG)", 
             type=['jpg', 'jpeg', 'png'],
@@ -120,7 +148,6 @@ with st.container():
             key=f"uploader_{st.session_state.uploader_key}"
         )
         
-        # ✅ 업로드된 이미지 미리보기 + 이미지 삭제 버튼
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
             st.image(image, caption="업로드된 이미지", use_container_width=True)
@@ -169,9 +196,9 @@ with st.container():
                             image = Image.open(uploaded_file)
                             
                             if image_query:
-                                prompt = image_query
+                                prompt = f"{image_query}\n\n답변 후 관련 유튜브 검색 키워드 3개도 추천해주세요."
                             else:
-                                prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요."
+                                prompt = "이 이미지를 자세히 분석하고 설명해주세요. 문제라면 풀이 과정도 알려주세요. 그리고 관련 유튜브 검색 키워드도 추천해주세요."
                             
                             response = model.generate_content([prompt, image])
                             
@@ -197,17 +224,18 @@ with st.container():
         st.session_state.uploader_key += 1
         st.rerun()
 
-    # ✅ 저장된 답변 표시 (링크 클릭 가능하게 변환)
+    # ✅ 저장된 답변 표시 (링크 자동 생성)
     if st.session_state.ai_response:
         st.success("답변 완료!")
         
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", width=400)
         
-        # ✅ 링크를 클릭 가능하게 변환
+        # ✅ URL 링크 변환 + 유튜브 검색 링크 추가
         clickable_response = make_links_clickable(st.session_state.ai_response)
+        final_response = add_youtube_search_links(clickable_response)
         
-        st.markdown(f"**💡 AI 답변:**\n\n{clickable_response}")
+        st.markdown(f"**💡 AI 답변:**\n\n{final_response}")
         st.caption(f"🤖 사용 모델: {st.session_state.model_name}")
         
         st.markdown("")
