@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components  # 🎤 음성 인식용 추가
 import google.generativeai as genai
 from PIL import Image
 import re
@@ -17,7 +18,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ========== 🎤 TTS 기능 추가 ==========
+# ========== 🎤 TTS 기능 (음성 출력) ==========
 async def text_to_speech_async(text, voice="ko-KR-SunHiNeural"):
     """
     Edge TTS로 한국어 음성 생성 (비동기)
@@ -111,19 +112,252 @@ def clean_text_for_tts(text):
     
     return text.strip()
 
-# ========== 기존 코드 (유지) ==========
+# ========== 🎤 음성 인식 기능 (음성 입력) ==========
+def create_voice_input_component():
+    """
+    Web Speech API를 사용한 음성 인식 컴포넌트
+    """
+    voice_html = """
+    <style>
+        .voice-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            border-radius: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        #voiceBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #voiceBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        
+        #voiceBtn.recording {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(245, 87, 108, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0); }
+        }
+        
+        #voiceBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        #status {
+            font-size: 14px;
+            color: #666;
+            flex: 1;
+        }
+        
+        #result-box {
+            display: none;
+            background: white;
+            padding: 12px 18px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+            margin-top: 10px;
+            font-size: 15px;
+        }
+        
+        #result-box.show {
+            display: block;
+        }
+        
+        .copy-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #059669;
+        }
+    </style>
+    
+    <div class="voice-container">
+        <button id="voiceBtn">
+            <span id="micIcon">🎤</span>
+            <span id="btnText">음성으로 질문하기</span>
+        </button>
+        <span id="status">버튼을 클릭하고 말씀해주세요</span>
+    </div>
+    
+    <div id="result-box">
+        <span id="finalResult"></span>
+        <button class="copy-btn" onclick="copyAndFill()">📋 입력창에 복사</button>
+    </div>
 
-# 2. 제목 및 소개
-st.title("⚙️ 일반기계기사 독학 가이드 🎬")
-st.markdown("""
-영욱이와 설매의 합격을 기원합니다.
-유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다. 
-주제를 클릭하면 **유튜브 검색 결과**로 바로 연결됩니다.
-""")
+    <script>
+    const voiceBtn = document.getElementById('voiceBtn');
+    const btnText = document.getElementById('btnText');
+    const micIcon = document.getElementById('micIcon');
+    const status = document.getElementById('status');
+    const resultBox = document.getElementById('result-box');
+    const finalResult = document.getElementById('finalResult');
+    
+    let recognizedText = '';
+    
+    // 음성 인식 지원 여부 확인
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        voiceBtn.disabled = true;
+        btnText.textContent = '음성 인식 미지원';
+        micIcon.textContent = '❌';
+        status.innerHTML = '<span style="color: #ef4444;">Chrome, Edge, 또는 삼성 인터넷 브라우저를 사용해주세요</span>';
+    } else {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        
+        recognition.lang = 'ko-KR';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
 
-st.divider()
+        voiceBtn.addEventListener('click', () => {
+            if (voiceBtn.classList.contains('recording')) {
+                recognition.stop();
+                return;
+            }
+            
+            recognition.start();
+            voiceBtn.classList.add('recording');
+            btnText.textContent = '듣는 중... (클릭하면 중지)';
+            micIcon.textContent = '🔴';
+            status.innerHTML = '<span style="color: #f5576c; font-weight: bold;">🎧 말씀해주세요...</span>';
+            resultBox.classList.remove('show');
+        });
 
-# 기존 함수들 (그대로 유지)
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            if (interimTranscript) {
+                status.innerHTML = '<span style="color: #667eea;">인식 중: "' + interimTranscript + '"</span>';
+            }
+            
+            if (finalTranscript) {
+                recognizedText = finalTranscript;
+                status.innerHTML = '<span style="color: #10b981; font-weight: bold;">✅ 인식 완료!</span>';
+                finalResult.textContent = '"' + finalTranscript + '"';
+                resultBox.classList.add('show');
+                
+                // 자동으로 입력창에 넣기 시도
+                fillInputField(finalTranscript);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('음성 인식 오류:', event.error);
+            voiceBtn.classList.remove('recording');
+            btnText.textContent = '음성으로 질문하기';
+            micIcon.textContent = '🎤';
+            
+            if (event.error === 'no-speech') {
+                status.innerHTML = '<span style="color: #f59e0b;">⚠️ 음성이 감지되지 않았어요. 다시 시도해주세요.</span>';
+            } else if (event.error === 'not-allowed') {
+                status.innerHTML = '<span style="color: #ef4444;">❌ 마이크 권한을 허용해주세요. (브라우저 설정 확인)</span>';
+            } else if (event.error === 'network') {
+                status.innerHTML = '<span style="color: #ef4444;">❌ 네트워크 오류. 인터넷 연결을 확인해주세요.</span>';
+            } else {
+                status.innerHTML = '<span style="color: #ef4444;">❌ 오류 발생: ' + event.error + '</span>';
+            }
+        };
+
+        recognition.onend = () => {
+            voiceBtn.classList.remove('recording');
+            btnText.textContent = '음성으로 질문하기';
+            micIcon.textContent = '🎤';
+        };
+    }
+    
+    function fillInputField(text) {
+        try {
+            // Streamlit 입력 필드 찾기
+            const parentDoc = window.parent.document;
+            const inputs = parentDoc.querySelectorAll('input[type="text"]');
+            
+            for (let input of inputs) {
+                // 질문 입력 필드 찾기
+                if (input.placeholder && (input.placeholder.includes('질문') || input.placeholder.includes('예:'))) {
+                    // React 방식으로 값 설정
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(input, text);
+                    
+                    // 이벤트 발생
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+                    // 포커스
+                    input.focus();
+                    
+                    status.innerHTML = '<span style="color: #10b981; font-weight: bold;">✅ "' + text + '" 입력창에 복사 완료!</span>';
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.log('자동 입력 실패, 수동 복사 필요:', e);
+        }
+        return false;
+    }
+    
+    function copyAndFill() {
+        if (recognizedText) {
+            // 클립보드에 복사
+            navigator.clipboard.writeText(recognizedText).then(() => {
+                status.innerHTML = '<span style="color: #10b981; font-weight: bold;">📋 클립보드에 복사됨! 입력창에 붙여넣기(Ctrl+V)하세요.</span>';
+            }).catch(() => {
+                // 클립보드 실패시 직접 입력 시도
+                fillInputField(recognizedText);
+            });
+            
+            // 입력 필드에도 직접 넣기 시도
+            fillInputField(recognizedText);
+        }
+    }
+    </script>
+    """
+    return voice_html
+
+# ========== 기존 유틸리티 함수들 ==========
+
 def format_youtube_links(text):
     youtube_patterns = [
         r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
@@ -276,7 +510,7 @@ def get_model_display_name(model_name):
     
     return model_name
 
-# 세션 스테이트 초기화
+# ========== 세션 스테이트 초기화 ==========
 if 'ai_response' not in st.session_state:
     st.session_state.ai_response = None
 if 'model_name' not in st.session_state:
@@ -290,10 +524,26 @@ if 'audio_playing' not in st.session_state:
 if 'selected_voice' not in st.session_state:
     st.session_state.selected_voice = "ko-KR-SunHiNeural"
 
+# ========== 페이지 제목 ==========
+st.title("⚙️ 일반기계기사 독학 가이드 🎬")
+st.markdown("""
+영욱이와 설매의 합격을 기원합니다.
+유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다. 
+주제를 클릭하면 **유튜브 검색 결과**로 바로 연결됩니다.
+""")
+
+st.divider()
+
 # ========== AI 튜터 섹션 ==========
 with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
-    st.caption("궁금한 개념을 텍스트 또는 **이미지(스크린샷, 문제 사진)**로 질문하세요!")
+    st.caption("궁금한 개념을 **🎤 음성, 📝 텍스트 또는 📸 이미지**로 질문하세요!")
+    
+    # 🎤 음성 입력 컴포넌트
+    st.markdown("#### 🎤 음성으로 질문하기")
+    components.html(create_voice_input_component(), height=150)
+    
+    st.markdown("---")
 
     tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
     
@@ -537,11 +787,12 @@ with st.container():
                 - ✅ 이미지 분석 (Vision)
                 - ✅ 멀티모달 처리
                 - ✅ 음성 출력 (TTS)
+                - ✅ 음성 입력 (STT)
                 """)
 
 st.divider()
 
-# ========== 나머지 기존 코드 (유튜브 채널, 과목별 강의 등) ==========
+# ========== 유튜브 채널 추천 ==========
 st.header("📺 1. 추천 유튜브 채널")
 st.caption("채널명을 클릭하면 해당 채널의 영상 목록으로 이동합니다.")
 
@@ -560,6 +811,7 @@ with col_ch5:
 
 st.markdown("")
 
+# ========== 과목별 강의 ==========
 st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 (기계구조해석) - 펼쳐보기", expanded=False):
@@ -601,6 +853,7 @@ with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계) - 펼쳐�
 
 st.markdown("")
 
+# ========== 실기 대비 ==========
 st.header("🎯 3. 실기 대비 (필답형 & 작업형)")
 
 col_prac1, col_prac2 = st.columns(2)
@@ -624,6 +877,7 @@ with col_prac2:
 
 st.divider()
 
+# ========== 학습 팁 ==========
 st.header("📚 4. 학습 팁 & 추가 자료")
 
 with st.expander("💡 효율적인 학습 방법", expanded=False):
@@ -655,13 +909,14 @@ with st.expander("📖 추천 교재 & 사이트", expanded=False):
 
 st.divider()
 
+# ========== 푸터 ==========
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
     <p>🔥 <strong>일반기계기사 합격을 응원합니다!</strong> 🔥</p>
-    <p style='font-size: 0.9em;'>💡 TIP: AI 튜터에게 모르는 부분을 바로 질문하고 음성으로도 들어보세요!</p>
+    <p style='font-size: 0.9em;'>💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!</p>
     <p style='font-size: 0.8em; margin-top: 10px;'>
-        Made with ❤️ by Streamlit | Powered by Google Gemini AI + Edge TTS
+        Made with ❤️ by Streamlit | Powered by Google Gemini AI + Edge TTS + Web Speech API
     </p>
 </div>
 """, unsafe_allow_html=True)
