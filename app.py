@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components  # 🎤 음성 인식용 추가
+import streamlit.components.v1 as components
 import google.generativeai as genai
 from PIL import Image
 import re
@@ -11,36 +11,181 @@ import base64
 from pathlib import Path
 import tempfile
 
-# 1. 페이지 기본 설정
+# ========== 1. 페이지 기본 설정 (모바일 최적화) ==========
 st.set_page_config(
     page_title="일반기계기사 학습 가이드",
     page_icon="⚙️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"  # 모바일에서 사이드바 자동 닫기
 )
+
+# ========== 🎨 모바일 최적화 CSS (완전 새로 작성) ==========
+st.markdown("""
+<style>
+    /* ========== 모바일 뷰포트 완벽 대응 ========== */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
+        height: 100%;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        min-height: 100dvh; /* 2025년 표준 */
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* ========== Streamlit 기본 패딩 제거 (모바일 공간 확보) ========== */
+    .main .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
+    }
+    
+    /* ========== 모바일 텍스트 크기 최적화 ========== */
+    @media (max-width: 768px) {
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.3rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        p, li, div { font-size: 0.95rem !important; line-height: 1.6 !important; }
+        
+        /* 버튼 터치 영역 확대 */
+        button, [data-testid="stButton"] button {
+            min-height: 48px !important;
+            padding: 12px 20px !important;
+            font-size: 1rem !important;
+        }
+        
+        /* 입력창 터치 최적화 */
+        input, textarea {
+            font-size: 16px !important; /* iOS 자동 줌 방지 */
+            min-height: 48px !important;
+        }
+        
+        /* 컬럼 모바일 대응 */
+        [data-testid="column"] {
+            min-width: 100% !important;
+            margin-bottom: 1rem !important;
+        }
+    }
+    
+    /* ========== 이미지 반응형 처리 ========== */
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+        border-radius: 8px;
+    }
+    
+    /* ========== 탭 모바일 최적화 ========== */
+    [data-testid="stTabs"] {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* ========== expander 터치 영역 확대 ========== */
+    [data-testid="stExpander"] summary {
+        min-height: 48px !important;
+        padding: 12px !important;
+        font-size: 1rem !important;
+    }
+    
+    /* ========== 링크 터치 최적화 ========== */
+    a {
+        padding: 8px 4px !important;
+        display: inline-block;
+        min-height: 44px;
+        line-height: 28px;
+    }
+    
+    /* ========== 음성 버튼 모바일 최적화 ========== */
+    .voice-container {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    
+    @media (max-width: 768px) {
+        .voice-container {
+            flex-direction: column;
+            gap: 10px !important;
+        }
+        
+        #voiceBtn {
+            width: 100% !important;
+            min-height: 56px !important;
+            font-size: 1.1rem !important;
+        }
+        
+        #status {
+            text-align: center;
+            width: 100%;
+        }
+        
+        #result-box {
+            font-size: 0.95rem !important;
+            padding: 15px !important;
+        }
+    }
+    
+    /* ========== 아이폰 노치/홈바 대응 ========== */
+    @supports (padding: max(0px)) {
+        .main .block-container {
+            padding-top: max(2rem, env(safe-area-inset-top)) !important;
+            padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important;
+            padding-left: max(1rem, env(safe-area-inset-left)) !important;
+            padding-right: max(1rem, env(safe-area-inset-right)) !important;
+        }
+    }
+    
+    /* ========== 오디오 플레이어 반응형 ========== */
+    audio {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 48px;
+    }
+    
+    /* ========== 스크롤바 디자인 (모바일 친화적) ========== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.2);
+        border-radius: 4px;
+    }
+    
+    /* ========== 로딩 스피너 중앙 정렬 ========== */
+    [data-testid="stSpinner"] {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 9999;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ========== 🎤 TTS 기능 (음성 출력) ==========
 async def text_to_speech_async(text, voice="ko-KR-SunHiNeural"):
-    """
-    Edge TTS로 한국어 음성 생성 (비동기)
-    voice 옵션:
-    - ko-KR-SunHiNeural: 여자 목소리 (부드럽고 자연스러움)
-    - ko-KR-InJoonNeural: 남자 목소리 (차분하고 명확함)
-    """
-    communicate = edge_tts.Communicate(text, voice)
-    
-    # 메모리에 저장
-    audio_data = io.BytesIO()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            audio_data.write(chunk["data"])
-    
-    audio_data.seek(0)
-    return audio_data.getvalue()
+    """Edge TTS 음성 생성"""
+    try:
+        communicate = edge_tts.Communicate(text, voice)
+        audio_data = io.BytesIO()
+        
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data.write(chunk["data"])
+        
+        audio_data.seek(0)
+        return audio_data.getvalue()
+    except Exception as e:
+        st.error(f"음성 생성 실패: {e}")
+        return None
 
 def text_to_speech(text, voice="ko-KR-SunHiNeural"):
-    """
-    동기 래퍼 함수
-    """
+    """동기 래퍼"""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -52,103 +197,78 @@ def text_to_speech(text, voice="ko-KR-SunHiNeural"):
         return None
 
 def create_audio_player(audio_bytes):
-    """
-    HTML5 오디오 플레이어 생성
-    """
+    """HTML5 오디오 플레이어"""
     audio_base64 = base64.b64encode(audio_bytes).decode()
-    audio_html = f"""
-    <audio controls autoplay style="width: 100%;">
+    return f"""
+    <audio controls autoplay style="width: 100%; max-width: 100%; min-height: 48px; border-radius: 8px;">
         <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
         브라우저가 오디오를 지원하지 않습니다.
     </audio>
     """
-    return audio_html
 
 def clean_text_for_tts(text):
-    """
-    TTS용 텍스트 정제 (마크다운 제거, 특수문자 처리)
-    """
-    # 마크다운 링크 제거 [텍스트](url) -> 텍스트
+    """TTS용 텍스트 정제"""
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
-    
-    # HTML 태그 제거
     text = re.sub(r'<[^>]+>', '', text)
-    
-    # 마크다운 강조 제거 (**, __, ~~)
     text = re.sub(r'[*_~`]+', '', text)
-    
-    # 헤딩 마크 제거 (###, ##, #)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     
-    # 이모지 제거 또는 설명으로 변환
     emoji_map = {
-        '✅': '체크',
-        '❌': '주의',
-        '⚠️': '경고',
-        '💡': '팁',
-        '📺': '영상',
-        '🔍': '검색',
-        '📝': '노트',
-        '🎯': '목표',
-        '🔥': '중요',
-        '📚': '학습',
-        '⚙️': '기계',
-        '🎬': '동영상'
+        '✅': '체크', '❌': '주의', '⚠️': '경고', '💡': '팁',
+        '📺': '영상', '🔍': '검색', '📝': '노트', '🎯': '목표',
+        '🔥': '중요', '📚': '학습', '⚙️': '기계', '🎬': '동영상'
     }
     
     for emoji, desc in emoji_map.items():
         text = text.replace(emoji, f' {desc} ')
     
-    # 남은 이모지 제거
     text = re.sub(r'[\U0001F300-\U0001F9FF]', '', text)
-    
-    # 연속 공백 제거
     text = re.sub(r'\s+', ' ', text)
     
-    # 너무 긴 텍스트는 앞부분만 (TTS 제한 고려)
-    max_length = 3000  # Edge TTS 권장 최대 길이
-    if len(text) > max_length:
-        text = text[:max_length] + "... 이하 생략됩니다."
+    if len(text) > 3000:
+        text = text[:3000] + "... 이하 생략됩니다."
     
     return text.strip()
 
-# ========== 🎤 음성 인식 기능 (음성 입력) ==========
+# ========== 🎤 음성 인식 컴포넌트 (완전 재작성 - 모바일 최적화) ==========
 def create_voice_input_component():
-    """
-    Web Speech API를 사용한 음성 인식 컴포넌트
-    """
-    voice_html = """
+    """모바일 완벽 대응 음성 인식"""
+    return """
     <style>
         .voice-container {
             display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            padding: 20px 15px;
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
-            border-radius: 15px;
+            border-radius: 16px;
             margin: 10px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         
         #voiceBtn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 14px 28px;
-            font-size: 16px;
-            border-radius: 30px;
+            padding: 18px 24px;
+            font-size: 1.1rem;
+            border-radius: 12px;
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
             transition: all 0.3s ease;
             font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            min-height: 56px;
+            -webkit-tap-highlight-color: transparent;
         }
         
-        #voiceBtn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        #voiceBtn:active {
+            transform: scale(0.98);
         }
         
         #voiceBtn.recording {
@@ -169,19 +289,26 @@ def create_voice_input_component():
         }
         
         #status {
-            font-size: 14px;
+            font-size: 0.95rem;
             color: #666;
-            flex: 1;
+            text-align: center;
+            padding: 8px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         #result-box {
             display: none;
             background: white;
-            padding: 12px 18px;
-            border-radius: 10px;
+            padding: 15px;
+            border-radius: 12px;
             border: 2px solid #667eea;
-            margin-top: 10px;
-            font-size: 15px;
+            margin-top: 5px;
+            font-size: 1rem;
+            word-break: keep-all;
+            line-height: 1.6;
         }
         
         #result-box.show {
@@ -192,15 +319,27 @@ def create_voice_input_component():
             background: #10b981;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 12px 20px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 13px;
-            margin-left: 10px;
+            font-size: 0.95rem;
+            margin-top: 10px;
+            width: 100%;
+            min-height: 48px;
+            font-weight: bold;
+            -webkit-tap-highlight-color: transparent;
         }
         
-        .copy-btn:hover {
+        .copy-btn:active {
             background: #059669;
+            transform: scale(0.98);
+        }
+        
+        @media (max-width: 768px) {
+            .voice-container { padding: 15px; }
+            #voiceBtn { font-size: 1rem; padding: 16px 20px; }
+            #status { font-size: 0.9rem; }
+            #result-box { font-size: 0.95rem; padding: 12px; }
         }
     </style>
     
@@ -209,11 +348,11 @@ def create_voice_input_component():
             <span id="micIcon">🎤</span>
             <span id="btnText">음성으로 질문하기</span>
         </button>
-        <span id="status">버튼을 클릭하고 말씀해주세요</span>
+        <div id="status">버튼을 클릭하고 말씀해주세요</div>
     </div>
     
     <div id="result-box">
-        <span id="finalResult"></span>
+        <div id="finalResult"></div>
         <button class="copy-btn" onclick="copyAndFill()">📋 입력창에 복사</button>
     </div>
 
@@ -227,12 +366,11 @@ def create_voice_input_component():
     
     let recognizedText = '';
     
-    // 음성 인식 지원 여부 확인
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         voiceBtn.disabled = true;
         btnText.textContent = '음성 인식 미지원';
         micIcon.textContent = '❌';
-        status.innerHTML = '<span style="color: #ef4444;">Chrome, Edge, 또는 삼성 인터넷 브라우저를 사용해주세요</span>';
+        status.innerHTML = '<span style="color: #ef4444;">Chrome/Edge/삼성 인터넷 브라우저를 사용해주세요</span>';
     } else {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -248,12 +386,16 @@ def create_voice_input_component():
                 return;
             }
             
-            recognition.start();
-            voiceBtn.classList.add('recording');
-            btnText.textContent = '듣는 중... (클릭하면 중지)';
-            micIcon.textContent = '🔴';
-            status.innerHTML = '<span style="color: #f5576c; font-weight: bold;">🎧 말씀해주세요...</span>';
-            resultBox.classList.remove('show');
+            try {
+                recognition.start();
+                voiceBtn.classList.add('recording');
+                btnText.textContent = '듣는 중... (클릭하면 중지)';
+                micIcon.textContent = '🔴';
+                status.innerHTML = '<span style="color: #f5576c; font-weight: bold;">🎧 말씀해주세요...</span>';
+                resultBox.classList.remove('show');
+            } catch (e) {
+                console.error('음성 인식 시작 실패:', e);
+            }
         });
 
         recognition.onresult = (event) => {
@@ -279,8 +421,7 @@ def create_voice_input_component():
                 finalResult.textContent = '"' + finalTranscript + '"';
                 resultBox.classList.add('show');
                 
-                // 자동으로 입력창에 넣기 시도
-                fillInputField(finalTranscript);
+                setTimeout(() => fillInputField(finalTranscript), 300);
             }
         };
 
@@ -290,15 +431,15 @@ def create_voice_input_component():
             btnText.textContent = '음성으로 질문하기';
             micIcon.textContent = '🎤';
             
-            if (event.error === 'no-speech') {
-                status.innerHTML = '<span style="color: #f59e0b;">⚠️ 음성이 감지되지 않았어요. 다시 시도해주세요.</span>';
-            } else if (event.error === 'not-allowed') {
-                status.innerHTML = '<span style="color: #ef4444;">❌ 마이크 권한을 허용해주세요. (브라우저 설정 확인)</span>';
-            } else if (event.error === 'network') {
-                status.innerHTML = '<span style="color: #ef4444;">❌ 네트워크 오류. 인터넷 연결을 확인해주세요.</span>';
-            } else {
-                status.innerHTML = '<span style="color: #ef4444;">❌ 오류 발생: ' + event.error + '</span>';
-            }
+            const errorMessages = {
+                'no-speech': '⚠️ 음성이 감지되지 않았어요',
+                'not-allowed': '❌ 마이크 권한을 허용해주세요',
+                'network': '❌ 네트워크 오류',
+                'aborted': 'ℹ️ 음성 인식이 중단되었습니다'
+            };
+            
+            status.innerHTML = '<span style="color: #ef4444;">' + 
+                (errorMessages[event.error] || '❌ 오류: ' + event.error) + '</span>';
         };
 
         recognition.onend = () => {
@@ -310,54 +451,45 @@ def create_voice_input_component():
     
     function fillInputField(text) {
         try {
-            // Streamlit 입력 필드 찾기
             const parentDoc = window.parent.document;
-            const inputs = parentDoc.querySelectorAll('input[type="text"]');
+            const inputs = parentDoc.querySelectorAll('input[type="text"], textarea');
             
             for (let input of inputs) {
-                // 질문 입력 필드 찾기
-                if (input.placeholder && (input.placeholder.includes('질문') || input.placeholder.includes('예:'))) {
-                    // React 방식으로 값 설정
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                if (!input.value || input.placeholder?.includes('질문') || input.placeholder?.includes('예:')) {
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype, 'value'
+                    ).set;
                     nativeInputValueSetter.call(input, text);
                     
-                    // 이벤트 발생
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    // 포커스
                     input.focus();
                     
-                    status.innerHTML = '<span style="color: #10b981; font-weight: bold;">✅ "' + text + '" 입력창에 복사 완료!</span>';
+                    status.innerHTML = '<span style="color: #10b981; font-weight: bold;">✅ 입력창에 복사 완료!</span>';
                     return true;
                 }
             }
         } catch (e) {
-            console.log('자동 입력 실패, 수동 복사 필요:', e);
+            console.log('자동 입력 실패:', e);
         }
         return false;
     }
     
     function copyAndFill() {
         if (recognizedText) {
-            // 클립보드에 복사
             navigator.clipboard.writeText(recognizedText).then(() => {
-                status.innerHTML = '<span style="color: #10b981; font-weight: bold;">📋 클립보드에 복사됨! 입력창에 붙여넣기(Ctrl+V)하세요.</span>';
+                status.innerHTML = '<span style="color: #10b981; font-weight: bold;">📋 복사됨! 붙여넣기(Ctrl+V)하세요</span>';
             }).catch(() => {
-                // 클립보드 실패시 직접 입력 시도
                 fillInputField(recognizedText);
             });
             
-            // 입력 필드에도 직접 넣기 시도
             fillInputField(recognizedText);
         }
     }
     </script>
     """
-    return voice_html
 
-# ========== 기존 유틸리티 함수들 ==========
-
+# ========== 유틸리티 함수들 ==========
 def format_youtube_links(text):
     youtube_patterns = [
         r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
@@ -370,12 +502,16 @@ def format_youtube_links(text):
         full_url = match.group(0)
         
         return f"""
-<div style="border: 2px solid #ff0000; border-radius: 10px; padding: 15px; margin: 10px 0; background-color: #fff5f5;">
+<div style="border: 2px solid #ff0000; border-radius: 12px; padding: 15px; margin: 15px 0; background-color: #fff5f5;">
     <h4 style="color: #ff0000; margin-top: 0;">📺 추천 영상</h4>
-    <a href="{full_url}" target="_blank">
-        <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 100%; border-radius: 5px; margin: 10px 0;">
+    <a href="{full_url}" target="_blank" rel="noopener noreferrer">
+        <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
+             style="width: 100%; max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;">
     </a>
-    <a href="{full_url}" target="_blank" style="display: inline-block; background-color: #ff0000; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+    <a href="{full_url}" target="_blank" rel="noopener noreferrer" 
+       style="display: block; background-color: #ff0000; color: white; padding: 14px 20px; 
+              border-radius: 10px; text-decoration: none; font-weight: bold; text-align: center; 
+              min-height: 48px; line-height: 20px;">
         🎬 영상 바로보기 →
     </a>
 </div>
@@ -470,23 +606,14 @@ def get_best_gemini_model():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        priority_order = [
-            'gemini-3',
-            'gemini-2.5',
-            'gemini-2.0', 
-            'gemini-1.5',
-            'gemini-pro'
-        ]
+        priority_order = ['gemini-3', 'gemini-2.5', 'gemini-2.0', 'gemini-1.5', 'gemini-pro']
         
         for priority in priority_order:
             for model_name in available_models:
                 if priority in model_name.lower():
                     return model_name
         
-        if available_models:
-            return available_models[0]
-        
-        return None
+        return available_models[0] if available_models else None
         
     except Exception as e:
         st.error(f"모델 목록 조회 실패: {e}")
@@ -527,9 +654,8 @@ if 'selected_voice' not in st.session_state:
 # ========== 페이지 제목 ==========
 st.title("⚙️ 일반기계기사 독학 가이드 🎬")
 st.markdown("""
-영욱이와 설매의 합격을 기원합니다.
-유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다. 
-주제를 클릭하면 **유튜브 검색 결과**로 바로 연결됩니다.
+영욱이와 설매의 합격을 기원합니다.  
+유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
 """)
 
 st.divider()
@@ -539,24 +665,24 @@ with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념을 **🎤 음성, 📝 텍스트 또는 📸 이미지**로 질문하세요!")
     
-    # 🎤 음성 입력 컴포넌트
+    # 🎤 음성 입력
     st.markdown("#### 🎤 음성으로 질문하기")
-    components.html(create_voice_input_component(), height=150)
+    components.html(create_voice_input_component(), height=200, scrolling=False)
     
     st.markdown("---")
 
     tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
     
-    # 텍스트 질문 탭
+    # 텍스트 질문
     with tab1:
         with st.form(key="text_question_form", clear_on_submit=True):
-            query = st.text_input("질문 입력", placeholder="예: 재료역학 공부 순서 알려줘")
+            query = st.text_input(
+                "질문 입력", 
+                placeholder="예: 재료역학 공부 순서 알려줘",
+                label_visibility="collapsed"
+            )
             
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                text_submit_btn = st.form_submit_button("🔍 질문하기", use_container_width=True)
-            with col2:
-                pass
+            text_submit_btn = st.form_submit_button("🔍 질문하기", use_container_width=True)
 
         if text_submit_btn and query:
             try:
@@ -576,17 +702,10 @@ with st.container():
 {query}
 
 답변 형식:
-1. 핵심 개념 설명 (이해하기 쉽게)
+1. 핵심 개념 설명
 2. 공식이나 계산 방법 (있다면)
-3. 시험 출제 경향 및 주의사항
-4. 📺 추천 채널 및 영상 (아래 형식으로):
-   
-   **채널명:** 홍교수
-   **특징:** 간결한 설명
-   **추천 영상:** "열역학 1법칙 완벽 정리"
-   
-   (이런 식으로 2-3개 채널 추천)
-
+3. 시험 출제 경향
+4. 📺 추천 채널 (채널명, 특징, 추천 영상)
 5. 유튜브 검색 키워드 3개
 """
                             
@@ -598,46 +717,42 @@ with st.container():
                         else:
                             st.error("❌ 사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
-                    st.error("⚠️ API 키가 설정되지 않았습니다. Streamlit Secrets에 GOOGLE_API_KEY를 추가하세요.")
+                    st.error("⚠️ API 키가 설정되지 않았습니다.")
                     
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
                 if "429" in str(e):
-                    st.warning("⏰ API 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.")
-                elif "403" in str(e):
-                    st.warning("🔑 API 키가 유효하지 않습니다. 새로운 키를 발급받으세요.")
+                    st.warning("⏰ API 사용량 제한. 잠시 후 다시 시도하세요.")
     
-    # 이미지 질문 탭
+    # 이미지 질문
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
         uploaded_file = st.file_uploader(
-            "이미지 업로드 (JPG, PNG)", 
+            "이미지 업로드", 
             type=['jpg', 'jpeg', 'png'],
-            help="문제 사진이나 이해가 안 되는 부분 스크린샷을 올려주세요",
-            key=f"uploader_{st.session_state.uploader_key}"
+            help="문제 사진이나 스크린샷을 올려주세요",
+            key=f"uploader_{st.session_state.uploader_key}",
+            label_visibility="collapsed"
         )
         
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
-            st.image(image, caption="업로드된 이미지", use_container_width=True)
+            st.image(image, caption="업로드된 이미지", use_column_width=True)
             
-            if st.button("🖼️ 이미지 삭제", key="delete_image"):
+            if st.button("🖼️ 이미지 삭제", key="delete_image", use_container_width=True):
                 st.session_state.uploader_key += 1
                 st.session_state.uploaded_image = None
                 st.rerun()
         
         with st.form(key="image_question_form", clear_on_submit=True):
             image_query = st.text_input(
-                "이미지에 대한 질문 (선택)", 
-                placeholder="예: 이 문제 풀이 과정 설명해줘"
+                "이미지에 대한 질문", 
+                placeholder="예: 이 문제 풀이 과정 설명해줘",
+                label_visibility="collapsed"
             )
             
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                image_submit_btn = st.form_submit_button("🔍 이미지 질문", use_container_width=True)
-            with col2:
-                pass
+            image_submit_btn = st.form_submit_button("🔍 이미지 질문", use_container_width=True)
         
         if image_submit_btn and uploaded_file is not None:
             try:
@@ -650,30 +765,16 @@ with st.container():
                         
                         if model_name:
                             model = genai.GenerativeModel(model_name)
-                            
                             image = Image.open(uploaded_file)
                             
-                            if image_query:
-                                prompt = f"""
-이미지를 분석하고 다음 질문에 답해주세요:
-{image_query}
-
-답변에 포함할 내용:
-1. 이미지에 보이는 핵심 내용 설명
-2. 문제라면 단계별 풀이 과정
-3. 관련 개념 및 공식
-4. 📺 추천 유튜브 채널 및 영상 (채널명과 영상 제목 포함)
-5. 검색 키워드
-"""
-                            else:
-                                prompt = """
-이 이미지를 자세히 분석하고 설명해주세요.
+                            prompt = f"""
+이미지를 분석하고 {'다음 질문에 답해주세요: ' + image_query if image_query else '설명해주세요'}
 
 답변 형식:
-1. 이미지에 포함된 내용 (문제, 도면, 공식 등)
-2. 관련 개념 설명
-3. 문제라면 풀이 과정
-4. 📺 추천 유튜브 채널 및 영상
+1. 이미지 내용 분석
+2. 문제라면 단계별 풀이
+3. 관련 개념 및 공식
+4. 📺 추천 영상
 5. 검색 키워드
 """
                             
@@ -683,21 +784,16 @@ with st.container():
                             st.session_state.model_name = model_name
                             st.session_state.uploaded_image = image
                         else:
-                            st.error("❌ 사용 가능한 Gemini 모델을 찾을 수 없습니다.")
+                            st.error("❌ 모델을 찾을 수 없습니다.")
                 else:
                     st.error("⚠️ API 키가 설정되지 않았습니다.")
                     
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
-                if "429" in str(e):
-                    st.warning("⏰ API 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.")
-                elif "403" in str(e):
-                    st.warning("🔑 API 키가 유효하지 않습니다.")
 
-    # ✅ 답변 표시 + TTS 기능
+    # ✅ 답변 표시 + TTS
     st.markdown("")
     if st.session_state.ai_response:
-        # 상단 컨트롤 버튼
         col_del, col_voice, col_tts = st.columns([1, 2, 2])
         
         with col_del:
@@ -711,10 +807,10 @@ with st.container():
         
         with col_voice:
             voice_option = st.selectbox(
-                "🎙️ 목소리 선택",
+                "🎙️ 목소리",
                 options=[
-                    ("ko-KR-SunHiNeural", "👩 여자 목소리 (부드러움)"),
-                    ("ko-KR-InJoonNeural", "👨 남자 목소리 (차분함)")
+                    ("ko-KR-SunHiNeural", "👩 여자"),
+                    ("ko-KR-InJoonNeural", "👨 남자")
                 ],
                 format_func=lambda x: x[1],
                 key="voice_selector"
@@ -723,23 +819,19 @@ with st.container():
         
         with col_tts:
             if st.button("🔊 음성으로 듣기", key="tts_button", use_container_width=True):
-                with st.spinner("🎤 음성을 생성하는 중..."):
-                    # TTS용 텍스트 정제
+                with st.spinner("🎤 음성 생성 중..."):
                     clean_text = clean_text_for_tts(st.session_state.ai_response)
-                    
-                    # 음성 생성
                     audio_bytes = text_to_speech(clean_text, st.session_state.selected_voice)
                     
                     if audio_bytes:
                         st.session_state.audio_playing = True
-                        st.success("✅ 음성이 준비되었습니다!")
+                        st.success("✅ 음성 준비 완료!")
         
-        # 오디오 플레이어 표시
+        # 오디오 플레이어
         if st.session_state.audio_playing:
             st.markdown("---")
             st.markdown("### 🎧 음성 재생")
             
-            # 음성 재생
             clean_text = clean_text_for_tts(st.session_state.ai_response)
             audio_bytes = text_to_speech(clean_text, st.session_state.selected_voice)
             
@@ -747,19 +839,17 @@ with st.container():
                 audio_html = create_audio_player(audio_bytes)
                 st.markdown(audio_html, unsafe_allow_html=True)
                 
-                if st.button("⏹️ 음성 정지", key="stop_audio"):
+                if st.button("⏹️ 음성 정지", key="stop_audio", use_container_width=True):
                     st.session_state.audio_playing = False
                     st.rerun()
             
             st.markdown("---")
         
-        # 업로드된 이미지 표시
+        # 이미지 표시
         if st.session_state.uploaded_image:
-            col_img, col_space = st.columns([1, 2])
-            with col_img:
-                st.image(st.session_state.uploaded_image, caption="질문한 이미지", use_column_width=True)
+            st.image(st.session_state.uploaded_image, caption="질문한 이미지", use_column_width=True)
         
-        # AI 답변 표시
+        # AI 답변
         response_text = st.session_state.ai_response
         response_text = format_youtube_links(response_text)
         response_text = add_youtube_search_links(response_text)
@@ -772,151 +862,160 @@ with st.container():
         # 모델 정보
         display_name = get_model_display_name(st.session_state.model_name)
         
-        with st.expander("🤖 사용된 AI 모델 정보", expanded=False):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"""
-                **코어 모델:** {display_name}  
-                **운영 티어:** Free Tier (무료 버전)  
-                **기술 ID:** `{st.session_state.model_name}`
-                """)
-            with col2:
-                st.markdown("""
-                **지원 기능:**
-                - ✅ 텍스트 생성
-                - ✅ 이미지 분석 (Vision)
-                - ✅ 멀티모달 처리
-                - ✅ 음성 출력 (TTS)
-                - ✅ 음성 입력 (STT)
-                """)
+        with st.expander("🤖 AI 모델 정보", expanded=False):
+            st.markdown(f"""
+**모델:** {display_name}  
+**ID:** `{st.session_state.model_name}`
+
+**지원 기능:**
+- ✅ 텍스트 생성
+- ✅ 이미지 분석
+- ✅ 음성 출력 (TTS)
+- ✅ 음성 입력 (STT)
+""")
 
 st.divider()
 
 # ========== 유튜브 채널 추천 ==========
 st.header("📺 1. 추천 유튜브 채널")
-st.caption("채널명을 클릭하면 해당 채널의 영상 목록으로 이동합니다.")
 
-col_ch1, col_ch2, col_ch3, col_ch4, col_ch5 = st.columns(5)
+col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
-    st.markdown("👉 [**기계달인**](https://www.youtube.com/results?search_query=기계달인+일반기계기사)\n\n(전과목 강의)")
+    st.markdown("""
+👉 [**기계달인**](https://www.youtube.com/results?search_query=기계달인+일반기계기사)  
+(전과목 강의)
+
+👉 [**에듀윌**](https://www.youtube.com/results?search_query=에듀윌+일반기계기사)  
+(핵심 요약)
+""")
+
 with col_ch2:
-    st.markdown("👉 [**에듀윌 기계**](https://www.youtube.com/results?search_query=에듀윌+일반기계기사)\n\n(핵심 요약)")
+    st.markdown("""
+👉 [**메가파이**](https://www.youtube.com/results?search_query=메가파이+일반기계기사)  
+(자격증 꿀팁)
+
+👉 [**한솔아카데미**](https://www.youtube.com/results?search_query=한솔아카데미+일반기계기사)  
+(기출 해설)
+""")
+
 with col_ch3:
-    st.markdown("👉 [**메가파이**](https://www.youtube.com/results?search_query=메가파이+일반기계기사)\n\n(자격증 꿀팁)")
-with col_ch4:
-    st.markdown("👉 [**한솔아카데미**](https://www.youtube.com/results?search_query=한솔아카데미+일반기계기사)\n\n(기출 해설)")
-with col_ch5:
-    st.markdown("👉 [**공밀레**](https://www.youtube.com/results?search_query=공밀레+재료역학)\n\n(개념 이해)")
+    st.markdown("""
+👉 [**공밀레**](https://www.youtube.com/results?search_query=공밀레+재료역학)  
+(개념 이해)
+
+👉 [**Learn Engineering**](https://www.youtube.com/results?search_query=Learn+Engineering)  
+(영문/애니메이션)
+""")
 
 st.markdown("")
 
 # ========== 과목별 강의 ==========
 st.header("🔍 2. 과목별 핵심 강의")
 
-with st.expander("1️⃣ 재료역학 (기계구조해석) - 펼쳐보기", expanded=False):
+with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
     st.markdown("""
-- [🧱 **기초/입문**: 재료역학 기초 강의 보기](https://www.youtube.com/results?search_query=재료역학+기초+강의)
-- [📉 **SFD/BMD**: 전단력/굽힘모멘트 선도 그리기](https://www.youtube.com/results?search_query=SFD+BMD+그리는법)
-- [➰ **보의 처짐**: 보의 처짐 공식 및 문제풀이](https://www.youtube.com/results?search_query=재료역학+보의+처짐)
-- [🌀 **모어원**: 모어원(Mohr's Circle) 그리는 법](https://www.youtube.com/results?search_query=재료역학+모어원)
-- [🏛️ **기둥/좌굴**: 오일러의 좌굴 공식](https://www.youtube.com/results?search_query=재료역학+좌굴+공식)
-- [📝 **기출문제**: 재료역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기출문제)
+- [🧱 기초 강의](https://www.youtube.com/results?search_query=재료역학+기초+강의)
+- [📉 SFD/BMD 그리기](https://www.youtube.com/results?search_query=SFD+BMD+그리는법)
+- [➰ 보의 처짐](https://www.youtube.com/results?search_query=재료역학+보의+처짐)
+- [🌀 모어원](https://www.youtube.com/results?search_query=재료역학+모어원)
+- [🏛️ 좌굴 공식](https://www.youtube.com/results?search_query=재료역학+좌굴+공식)
+- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기출문제)
 """)
 
-with st.expander("2️⃣ 기계열역학 (열·유체해석 Part 1) - 펼쳐보기"):
+with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
     st.markdown("""
-- [🔥 **기초 개념**: 열역학 0,1,2법칙](https://www.youtube.com/results?search_query=열역학+법칙+설명)
-- [🔄 **사이클**: 오토/디젤/사바테/랭킨 사이클](https://www.youtube.com/results?search_query=열역학+사이클+정리)
-- [🌡️ **엔트로피**: 엔트로피 개념 및 계산](https://www.youtube.com/results?search_query=열역학+엔트로피)
-- [💨 **냉동 사이클**: 증기압축/흡수식 냉동](https://www.youtube.com/results?search_query=일반기계기사+냉동사이클)
-- [📝 **기출문제**: 열역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+열역학+기출)
+- [🔥 열역학 법칙](https://www.youtube.com/results?search_query=열역학+법칙+설명)
+- [🔄 사이클 정리](https://www.youtube.com/results?search_query=열역학+사이클+정리)
+- [🌡️ 엔트로피](https://www.youtube.com/results?search_query=열역학+엔트로피)
+- [💨 냉동 사이클](https://www.youtube.com/results?search_query=일반기계기사+냉동사이클)
+- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+열역학+기출)
 """)
 
-with st.expander("3️⃣ 기계유체역학 (열·유체해석 Part 2) - 펼쳐보기"):
+with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
     st.markdown("""
-- [💧 **유체 성질**: 점성계수와 단위 변환](https://www.youtube.com/results?search_query=유체역학+점성계수)
-- [🌪️ **베르누이**: 베르누이 방정식 응용](https://www.youtube.com/results?search_query=베르누이+방정식+문제풀이)
-- [📏 **관로 마찰**: 레이놀즈 수와 손실수두](https://www.youtube.com/results?search_query=달시+바이스바흐+공식)
-- [⚡ **운동량 방정식**: 충격력 계산](https://www.youtube.com/results?search_query=유체역학+운동량방정식)
-- [📝 **기출문제**: 유체역학 기출문제 풀이](https://www.youtube.com/results?search_query=일반기계기사+유체역학+기출)
+- [💧 유체 성질](https://www.youtube.com/results?search_query=유체역학+점성계수)
+- [🌪️ 베르누이 방정식](https://www.youtube.com/results?search_query=베르누이+방정식+문제풀이)
+- [📏 관로 마찰](https://www.youtube.com/results?search_query=달시+바이스바흐+공식)
+- [⚡ 운동량 방정식](https://www.youtube.com/results?search_query=유체역학+운동량방정식)
+- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+유체역학+기출)
 """)
 
-with st.expander("4️⃣ 기계요소설계 (기계제도 및 설계) - 펼쳐보기"):
+with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
     st.markdown("""
-- [⚙️ **기어/베어링**: 기어 치형과 베어링 수명](https://www.youtube.com/results?search_query=기계요소설계+기어+베어링)
-- [🔩 **나사/볼트**: 나사의 역학 및 효율](https://www.youtube.com/results?search_query=기계요소설계+나사+효율)
-- [🛡️ **파손 이론**: 각종 파손 이론 정리](https://www.youtube.com/results?search_query=기계설계+파손이론)
-- [🔗 **축/커플링**: 축 설계 및 키 결합](https://www.youtube.com/results?search_query=기계요소설계+축+설계)
-- [📝 **기출문제**: 기계요소설계 기출](https://www.youtube.com/results?search_query=일반기계기사+기계요소설계+기출)
+- [⚙️ 기어/베어링](https://www.youtube.com/results?search_query=기계요소설계+기어+베어링)
+- [🔩 나사/볼트](https://www.youtube.com/results?search_query=기계요소설계+나사+효율)
+- [🛡️ 파손 이론](https://www.youtube.com/results?search_query=기계설계+파손이론)
+- [🔗 축/커플링](https://www.youtube.com/results?search_query=기계요소설계+축+설계)
+- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
 
 # ========== 실기 대비 ==========
-st.header("🎯 3. 실기 대비 (필답형 & 작업형)")
+st.header("🎯 3. 실기 대비")
 
 col_prac1, col_prac2 = st.columns(2)
 
 with col_prac1:
     st.subheader("📝 필답형")
     st.markdown("""
-- [📖 **필답형 요약 정리** (공식 암기용)](https://www.youtube.com/results?search_query=일반기계기사+필답형+요약)
-- [✍️ **필답형 기출 문제 풀이**](https://www.youtube.com/results?search_query=일반기계기사+필답형+기출)
-- [🎯 **자주 나오는 공식 정리**](https://www.youtube.com/results?search_query=일반기계기사+필답형+공식)
+- [📖 요약 정리](https://www.youtube.com/results?search_query=일반기계기사+필답형+요약)
+- [✍️ 기출 풀이](https://www.youtube.com/results?search_query=일반기계기사+필답형+기출)
+- [🎯 공식 정리](https://www.youtube.com/results?search_query=일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
-    st.subheader("💻 작업형 (2D/3D)")
+    st.subheader("💻 작업형")
     st.markdown("""
-- [🖱️ **작업형 인벤터 기초 강의**](https://www.youtube.com/results?search_query=일반기계기사+인벤터+기초)
-- [📐 **작업형 투상(도면해독) 연습**](https://www.youtube.com/results?search_query=일반기계기사+투상+연습)
-- [📏 **거칠기 & 기하공차 넣는 법**](https://www.youtube.com/results?search_query=일반기계기사+거칠기+기하공차)
-- [⚡ **작업형 기출 실습**](https://www.youtube.com/results?search_query=일반기계기사+작업형+기출)
+- [🖱️ 인벤터 기초](https://www.youtube.com/results?search_query=일반기계기사+인벤터+기초)
+- [📐 투상 연습](https://www.youtube.com/results?search_query=일반기계기사+투상+연습)
+- [📏 거칠기/공차](https://www.youtube.com/results?search_query=일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습](https://www.youtube.com/results?search_query=일반기계기사+작업형+기출)
 """)
 
 st.divider()
 
 # ========== 학습 팁 ==========
-st.header("📚 4. 학습 팁 & 추가 자료")
+st.header("📚 4. 학습 팁")
 
 with st.expander("💡 효율적인 학습 방법", expanded=False):
     st.markdown("""
-### 📌 필기 시험 준비 전략
-1. **과목별 배점 파악**: 과목당 40점 이상, 전체 60점 이상
-2. **학습 순서 추천**: 재료역학 → 열역학 → 유체역학 → 기계요소설계
-3. **기출문제 중심**: 최근 10개년 기출 3회독 이상
-4. **취약 과목 집중**: 과락 방지가 최우선
+### 📌 필기 전략
+1. **과목별 배점**: 과목당 40점 이상, 전체 60점 이상
+2. **학습 순서**: 재료역학 → 열역학 → 유체역학 → 기계요소설계
+3. **기출 중심**: 최근 10개년 3회독 이상
+4. **과락 방지** 최우선
 
-### 📌 실기 시험 준비 전략
-1. **필답형**: 주요 공식 암기 + 단위 환산 연습
-2. **작업형**: 인벤터 기본 조작 숙달 (최소 20시간)
-3. **시간 배분**: 필답 40분, 작업 80분 목표
-4. **기하공차/거칠기**: 실전 배치 연습 필수
+### 📌 실기 전략
+1. **필답형**: 공식 암기 + 단위 환산
+2. **작업형**: 인벤터 20시간 이상
+3. **시간 배분**: 필답 40분, 작업 80분
+4. **기하공차/거칠기** 실전 연습
 """)
 
-with st.expander("📖 추천 교재 & 사이트", expanded=False):
+with st.expander("📖 추천 자료", expanded=False):
     st.markdown("""
-### 📚 추천 교재
-- **SD에듀** / **예문사** 일반기계기사 필기/실기 교재
-- **성안당** 과년도 기출문제집
+### 📚 교재
+- SD에듀 / 예문사 / 성안당 기출문제집
 
-### 🌐 유용한 사이트
-- [큐넷 (Q-Net)](https://www.q-net.or.kr) - 시험 접수 및 기출문제
-- [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 학습 커뮤니티
-- [공학용 계산기 사용법](https://www.youtube.com/results?search_query=공학용계산기+사용법)
+### 🌐 사이트
+- [큐넷](https://www.q-net.or.kr) - 시험 접수
+- [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
+- [공학용 계산기](https://www.youtube.com/results?search_query=공학용계산기+사용법)
 """)
 
 st.divider()
 
 # ========== 푸터 ==========
-st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #666; padding: 20px;'>
-    <p>🔥 <strong>일반기계기사 합격을 응원합니다!</strong> 🔥</p>
-    <p style='font-size: 0.9em;'>💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!</p>
-    <p style='font-size: 0.8em; margin-top: 10px;'>
-        Made with ❤️ by Streamlit | Powered by Google Gemini AI + Edge TTS + Web Speech API
+<div style='text-align: center; color: #666; padding: 20px 10px;'>
+    <p style='font-size: 1.1rem; font-weight: bold;'>🔥 일반기계기사 합격을 응원합니다! 🔥</p>
+    <p style='font-size: 0.9rem; margin-top: 10px;'>
+        💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!
+    </p>
+    <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
+        Made with ❤️ | Powered by Gemini AI + Edge TTS + Web Speech API
     </p>
 </div>
 """, unsafe_allow_html=True)
