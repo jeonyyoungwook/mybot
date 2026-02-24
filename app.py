@@ -9,9 +9,7 @@ import edge_tts
 import io
 import base64
 import requests
-import time
-from typing import List, Tuple, Optional
-import yt_dlp
+from typing import List, Tuple
 
 # ========== 1. 페이지 기본 설정 ==========
 st.set_page_config(
@@ -21,12 +19,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ========== 🌐 Invidious 서버 자동 체크 (핵심!) ==========
-@st.cache_data(ttl=300)  # 5분마다 갱신
+# ========== 🌐 Invidious 서버 자동 체크 ==========
+@st.cache_data(ttl=300)
 def get_working_invidious_instances() -> List[Tuple[str, str]]:
     """살아있는 Invidious 서버를 자동으로 찾아서 반환"""
     try:
-        # Invidious 공식 인스턴스 목록 API
         api_url = "https://api.invidious.io/instances.json"
         response = requests.get(api_url, timeout=10)
         instances_data = response.json()
@@ -38,12 +35,10 @@ def get_working_invidious_instances() -> List[Tuple[str, str]]:
                 domain = instance[0]
                 info = instance[1]
                 
-                # 살아있고, HTTPS 지원하고, API 활성화된 서버만
                 if (info.get('type') == 'https' and 
                     info.get('api') == True and
                     info.get('monitor', {}).get('statusClass') in ['success', 'warning']):
                     
-                    # 실제로 접속 가능한지 빠르게 체크
                     test_url = f"https://{domain}/api/v1/videos/jNQXAC9IVRw"
                     
                     try:
@@ -51,7 +46,7 @@ def get_working_invidious_instances() -> List[Tuple[str, str]]:
                         if test_response.status_code < 500:
                             working_instances.append((domain, f"서버 {len(working_instances)+1}"))
                             
-                            if len(working_instances) >= 10:  # 최대 10개만
+                            if len(working_instances) >= 10:
                                 break
                     except:
                         continue
@@ -59,7 +54,6 @@ def get_working_invidious_instances() -> List[Tuple[str, str]]:
             except Exception:
                 continue
         
-        # 못 찾으면 fallback 서버들
         if not working_instances:
             fallback_instances = [
                 ("inv.tux.pizza", "독일 서버"),
@@ -80,72 +74,66 @@ def get_working_invidious_instances() -> List[Tuple[str, str]]:
         
         return working_instances if working_instances else [("youtube.com", "YouTube 원본")]
         
-    except Exception as e:
-        return [
-            ("inv.tux.pizza", "기본 서버"),
-            ("youtube.com", "YouTube 원본")
-        ]
+    except Exception:
+        return [("youtube.com", "YouTube 원본")]
 
 # ========== 🎬 광고 없는 YouTube 플레이어 ==========
 def create_ad_free_youtube_player(video_id: str, title: str = "YouTube 영상") -> str:
-    """실시간으로 살아있는 Invidious 서버를 찾아서 플레이어 생성"""
+    """링크 방식으로 안전하게 제공"""
     
     invidious_instances = get_working_invidious_instances()
+    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
     
-    if not invidious_instances or invidious_instances[0][0] == "youtube.com":
+    if invidious_instances and invidious_instances[0][0] != "youtube.com":
+        main_instance = invidious_instances[0][0]
+        main_watch_url = f"https://{main_instance}/watch?v={video_id}"
+        
+        server_buttons = ""
+        for i, (instance, name) in enumerate(invidious_instances[1:6], 1):
+            watch_url = f"https://{instance}/watch?v={video_id}"
+            server_buttons += f'''
+                <a href="{watch_url}" target="_blank" class="server-btn">
+                    🎬 {name}
+                </a>
+            '''
+        
         return f"""
         <div class="youtube-card">
-            <h4>⚠️ {title}</h4>
-            <p style="color: #ef4444;">
-                현재 사용 가능한 서버가 없습니다. 
-                <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">YouTube에서 보기 →</a>
-            </p>
+            <h4>🎬 {title} <span class="adfree-badge">광고 0개</span></h4>
+            
+            <a href="{main_watch_url}" target="_blank">
+                <img src="{thumbnail_url}" class="youtube-thumbnail" alt="{title}">
+            </a>
+            
+            <a href="{main_watch_url}" target="_blank" class="play-button">
+                ▶️ {main_instance}에서 보기 (광고 없음)
+            </a>
+            
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; color: #666; font-size: 0.85rem; padding: 8px; background: #f3f4f6; border-radius: 6px;">
+                    📡 다른 서버 선택
+                </summary>
+                <div class="server-selector">
+                    {server_buttons}
+                    <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" class="server-btn" style="background: #ff0000;">
+                        📺 YouTube 원본
+                    </a>
+                </div>
+            </details>
         </div>
         """
-    
-    main_instance = invidious_instances[0][0]
-    main_embed = f"https://{main_instance}/embed/{video_id}?autoplay=0&quality=dash&local=true"
-    
-    server_buttons = ""
-    for i, (instance, name) in enumerate(invidious_instances[1:6], 1):
-        embed_url = f"https://{instance}/embed/{video_id}?local=true"
-        server_buttons += f'''
-            <a href="{embed_url}" target="_blank" class="server-btn">
-                🎬 {name}에서 보기
+    else:
+        return f"""
+        <div class="youtube-card">
+            <h4>🎬 {title}</h4>
+            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
+                <img src="{thumbnail_url}" class="youtube-thumbnail" alt="{title}">
             </a>
-        '''
-    
-    return f"""
-    <div class="youtube-card">
-        <h4>🎬 {title} <span class="adfree-badge">광고 0개</span></h4>
-        <div class="adfree-youtube-container">
-            <iframe 
-                src="{main_embed}"
-                allowfullscreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                loading="lazy"
-                referrerpolicy="no-referrer"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                title="{title}"
-            ></iframe>
+            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" class="play-button">
+                ▶️ YouTube에서 보기
+            </a>
         </div>
-        <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
-            ✅ 현재 사용 중: <strong>{main_instance}</strong> | 
-            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
-                YouTube 원본 →
-            </a>
-        </p>
-        <details style="margin-top: 10px;">
-            <summary style="cursor: pointer; color: #666; font-size: 0.85rem; padding: 8px; background: #f3f4f6; border-radius: 6px;">
-                📡 재생 안 되면 다른 서버 선택
-            </summary>
-            <div class="server-selector">
-                <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">대체 서버들 (모두 광고 없음):</p>
-                {server_buttons}
-            </div>
-        </details>
-    </div>
-    """
+        """
 
 # ========== 🎨 모바일 최적화 CSS ==========
 st.markdown("""
@@ -190,26 +178,6 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    .adfree-youtube-container {
-        position: relative;
-        width: 100%;
-        padding-bottom: 56.25%;
-        margin: 20px 0;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        background: #000;
-    }
-    
-    .adfree-youtube-container iframe {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border: none;
-    }
-    
     .youtube-card {
         border: 2px solid #ff0000;
         border-radius: 12px;
@@ -221,6 +189,44 @@ st.markdown("""
     .youtube-card h4 {
         color: #ff0000;
         margin: 0 0 15px 0;
+    }
+    
+    .youtube-thumbnail {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 10px 0;
+        cursor: pointer;
+        transition: transform 0.2s;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .youtube-thumbnail:hover {
+        transform: scale(1.02);
+    }
+    
+    .play-button {
+        display: inline-block;
+        background-color: #ff0000;
+        color: white;
+        padding: 14px 24px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 48px;
+        line-height: 20px;
+        transition: background-color 0.2s;
+        margin-top: 10px;
+    }
+    
+    .play-button:hover {
+        background-color: #cc0000;
+        color: white;
+        text-decoration: none;
     }
     
     .adfree-badge {
@@ -264,6 +270,99 @@ st.markdown("""
         width: 100% !important;
         max-width: 100% !important;
         min-height: 48px;
+    }
+    
+    .voice-container {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    
+    #voiceBtn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 18px 24px;
+        font-size: 1.1rem;
+        border-radius: 12px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 56px;
+    }
+    
+    #voiceBtn:active {
+        transform: scale(0.98);
+    }
+    
+    #voiceBtn.recording {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.7); }
+        70% { box-shadow: 0 0 0 15px rgba(245, 87, 108, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0); }
+    }
+    
+    #voiceBtn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+    
+    #status {
+        font-size: 0.95rem;
+        color: #666;
+        text-align: center;
+        padding: 8px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #result-box {
+        display: none;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        border: 2px solid #667eea;
+        margin-top: 5px;
+        font-size: 1rem;
+        word-break: keep-all;
+        line-height: 1.6;
+    }
+    
+    #result-box.show {
+        display: block;
+    }
+    
+    .copy-btn {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        margin-top: 10px;
+        width: 100%;
+        min-height: 48px;
+        font-weight: bold;
+    }
+    
+    .copy-btn:active {
+        background: #059669;
+        transform: scale(0.98);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -341,92 +440,6 @@ def create_voice_input_component():
             border-radius: 16px;
             margin: 10px 0;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        #voiceBtn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 18px 24px;
-            font-size: 1.1rem;
-            border-radius: 12px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            min-height: 56px;
-        }
-        
-        #voiceBtn:active {
-            transform: scale(0.98);
-        }
-        
-        #voiceBtn.recording {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(245, 87, 108, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(245, 87, 108, 0); }
-        }
-        
-        #voiceBtn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-        
-        #status {
-            font-size: 0.95rem;
-            color: #666;
-            text-align: center;
-            padding: 8px;
-            min-height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        #result-box {
-            display: none;
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            border: 2px solid #667eea;
-            margin-top: 5px;
-            font-size: 1rem;
-            word-break: keep-all;
-            line-height: 1.6;
-        }
-        
-        #result-box.show {
-            display: block;
-        }
-        
-        .copy-btn {
-            background: #10b981;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            margin-top: 10px;
-            width: 100%;
-            min-height: 48px;
-            font-weight: bold;
-        }
-        
-        .copy-btn:active {
-            background: #059669;
-            transform: scale(0.98);
         }
     </style>
     
@@ -658,7 +671,7 @@ def get_best_gemini_model():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        priority_order = ['gemini-2.0-flash-exp', 'gemini-exp', 'gemini-2.5', 'gemini-2.0', 'gemini-1.5', 'gemini-pro']
+        priority_order = ['gemini-2.0-flash-exp', 'gemini-exp', 'gemini-2.0', 'gemini-1.5', 'gemini-pro']
         
         for priority in priority_order:
             for model_name in available_models:
@@ -678,7 +691,6 @@ def get_model_display_name(model_name):
     model_mapping = {
         'gemini-2.0-flash-exp': 'Gemini 2.0 Flash (실험)',
         'gemini-exp': 'Gemini Experimental',
-        'gemini-2.5': 'Gemini 2.5 Flash',
         'gemini-2.0': 'Gemini 2.0 Flash',
         'gemini-1.5': 'Gemini 1.5 Pro',
         'gemini-pro': 'Gemini Pro'
@@ -1061,7 +1073,7 @@ with st.expander("💡 효율적인 학습 방법", expanded=False):
 """)
 
 with st.expander("📖 추천 자료", expanded=False):
-    st.markdown("""
+    st.markdown(f"""
 ### 📚 교재
 - SD에듀 / 예문사 / 성안당 기출문제집
 
@@ -1125,7 +1137,7 @@ st.markdown(f"""
     </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
         Made with ❤️ by AI<br>
-        Powered by Gemini AI + Edge TTS + Invidious API + yt-dlp + Web Speech API
+        Powered by Gemini AI + Edge TTS + Invidious API + Web Speech API
     </p>
     <p style='font-size: 0.75rem; margin-top: 10px; color: #aaa;'>
         Invidious는 AGPL-3.0 라이선스 오픈소스 프로젝트입니다
