@@ -10,8 +10,6 @@ import io
 import base64
 from pathlib import Path
 import tempfile
-import requests
-import json
 
 # ========== 1. 페이지 기본 설정 (모바일 최적화) ==========
 st.set_page_config(
@@ -168,6 +166,32 @@ st.markdown("""
         font-size: 0.75rem;
         font-weight: bold;
         margin-left: 8px;
+    }
+    
+    .server-selector {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    
+    .server-btn {
+        display: inline-block;
+        background: #3b82f6;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        margin: 4px;
+        transition: background-color 0.2s;
+    }
+    
+    .server-btn:hover {
+        background: #2563eb;
+        color: white;
+        text-decoration: none;
     }
     
     .voice-container {
@@ -552,84 +576,59 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 🎬 진짜 광고 없는 YouTube 플레이어 (Invidious API 사용) ==========
-def get_invidious_stream_url(video_id):
-    """Invidious API로 직접 스트림 URL 가져오기"""
-    invidious_instances = [
-        "inv.nadeko.net",
-        "invidious.private.coffee", 
-        "yt.artemislena.eu",
-        "invidious.nerdvpn.de",
-        "inv.tux.pizza"
-    ]
-    
-    for instance in invidious_instances:
-        try:
-            url = f"https://{instance}/api/v1/videos/{video_id}"
-            response = requests.get(url, timeout=5)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # 1080p 또는 720p 스트림 찾기
-                for fmt in data.get('formatStreams', []):
-                    if '1080p' in fmt.get('qualityLabel', '') or '720p' in fmt.get('qualityLabel', ''):
-                        return fmt.get('url'), instance
-                
-                # 없으면 첫 번째 스트림
-                if data.get('formatStreams'):
-                    return data['formatStreams'][0].get('url'), instance
-                    
-        except Exception as e:
-            continue
-    
-    return None, None
-
+# ========== 🎬 완전 광고 없는 YouTube 플레이어 (순수 HTML만 사용) ==========
 def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
-    """완전 광고 없는 플레이어 생성"""
+    """Invidious 기반 광고 없는 플레이어 (외부 라이브러리 불필요)"""
     
-    # 방법 1: Invidious 임베드 (가장 안정적)
-    invidious_embed = f"https://invidious.private.coffee/embed/{video_id}?quality=dash&dark_mode=true&autoplay=0"
-    
-    # 방법 2: 대체 인스턴스들
-    alternative_embeds = [
-        f"https://inv.nadeko.net/embed/{video_id}",
-        f"https://yt.artemislena.eu/embed/{video_id}",
-        f"https://inv.tux.pizza/embed/{video_id}"
+    # 여러 Invidious 인스턴스 (자동 폴백)
+    invidious_instances = [
+        ("invidious.private.coffee", "주 서버"),
+        ("inv.nadeko.net", "서버 2"),
+        ("yt.artemislena.eu", "서버 3"),
+        ("inv.tux.pizza", "서버 4"),
+        ("invidious.nerdvpn.de", "서버 5")
     ]
+    
+    # 메인 임베드 URL
+    main_embed = f"https://{invidious_instances[0][0]}/embed/{video_id}?&autoplay=0&quality=dash"
+    
+    # 대체 서버 버튼들
+    server_buttons = ""
+    for i, (instance, name) in enumerate(invidious_instances[1:], 1):
+        embed_url = f"https://{instance}/embed/{video_id}"
+        server_buttons += f'''
+            <a href="{embed_url}" target="_blank" class="server-btn">
+                🎬 {name}에서 보기
+            </a>
+        '''
     
     return f"""
     <div class="youtube-card">
-        <h4>🎬 {title} <span class="adfree-badge">광고 없음</span></h4>
+        <h4>🎬 {title} <span class="adfree-badge">광고 0개</span></h4>
         <div class="adfree-youtube-container">
             <iframe 
-                src="{invidious_embed}"
+                src="{main_embed}"
                 allowfullscreen
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 loading="lazy"
                 referrerpolicy="no-referrer"
                 sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                title="{title}"
             ></iframe>
         </div>
         <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
             ✅ Invidious 제공 (광고 100% 차단) | 
             <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
-                YouTube 원본 보기 →
+                YouTube 원본 →
             </a>
         </p>
         <details style="margin-top: 10px;">
-            <summary style="cursor: pointer; color: #666; font-size: 0.85rem;">재생 안 되면 여기 클릭</summary>
-            <div style="margin-top: 10px;">
-                <p style="font-size: 0.85rem; color: #666;">대체 서버들:</p>
-                <a href="{alternative_embeds[0]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
-                    🎬 서버 1에서 보기
-                </a>
-                <a href="{alternative_embeds[1]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
-                    🎬 서버 2에서 보기
-                </a>
-                <a href="{alternative_embeds[2]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
-                    🎬 서버 3에서 보기
-                </a>
+            <summary style="cursor: pointer; color: #666; font-size: 0.85rem; padding: 8px; background: #f3f4f6; border-radius: 6px;">
+                📡 재생 안 되면 다른 서버 선택
+            </summary>
+            <div class="server-selector">
+                <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">대체 서버들 (모두 광고 없음):</p>
+                {server_buttons}
             </div>
         </details>
     </div>
@@ -646,12 +645,12 @@ def format_youtube_links(text):
     
     formatted_text = text
     for pattern, label in youtube_patterns:
-        matches = re.finditer(pattern, formatted_text)
-        for match in matches:
+        matches = list(re.finditer(pattern, formatted_text))
+        for match in reversed(matches):  # 뒤에서부터 처리 (인덱스 꼬임 방지)
             video_id = match.group(1)
             original_url = match.group(0)
-            player_html = create_ad_free_youtube_player(video_id, f"{label}")
-            formatted_text = formatted_text.replace(original_url, player_html, 1)
+            player_html = create_ad_free_youtube_player(video_id, label)
+            formatted_text = formatted_text[:match.start()] + player_html + formatted_text[match.end():]
     
     return formatted_text
 
@@ -661,7 +660,7 @@ def make_links_clickable(text):
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?')
-        return f'[🔗 링크 보기]({url})'
+        return f'[🔗 링크]({url})'
     
     return re.sub(url_pattern, replace_url, text)
 
@@ -987,7 +986,7 @@ st.divider()
 # ========== 광고 없는 채널 추천 ==========
 st.header("📺 1. 추천 유튜브 채널 (광고 없음)")
 
-st.info("💡 **모든 링크는 Invidious 서버를 통해 광고 없이 재생됩니다!**")
+st.info("💡 **모든 링크는 Invidious를 통해 광고 없이 재생됩니다!**")
 
 col_ch1, col_ch2, col_ch3 = st.columns(3)
 
@@ -1148,6 +1147,7 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 - https://inv.nadeko.net (백업 1)
 - https://yt.artemislena.eu (백업 2)
 - https://inv.tux.pizza (백업 3)
+- https://invidious.nerdvpn.de (백업 4)
 
 ### 🔒 왜 광고가 안 나올까?
 Invidious는 YouTube 데이터를 직접 추출해서  
@@ -1165,10 +1165,10 @@ st.markdown("""
         💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!
     </p>
     <p style='font-size: 0.9rem; margin-top: 10px; color: #10b981; font-weight: bold;'>
-        ✅ 모든 유튜브 영상은 광고 100% 차단됩니다 (Invidious 제공)
+        ✅ 모든 유튜브 영상 광고 100% 차단! (Invidious 제공)
     </p>
     <p style='font-size: 0.85rem; margin-top: 5px; color: #059669;'>
-        🚫 YouTube Premium 없어도 광고 0개 보장!
+        🚫 YouTube Premium 없어도 광고 0개!
     </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
         Made with ❤️ by AI<br>
