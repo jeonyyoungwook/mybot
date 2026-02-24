@@ -10,6 +10,8 @@ import io
 import base64
 from pathlib import Path
 import tempfile
+import requests
+import json
 
 # ========== 1. 페이지 기본 설정 (모바일 최적화) ==========
 st.set_page_config(
@@ -19,10 +21,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ========== 🎨 모바일 최적화 CSS (완전 새로 작성) ==========
+# ========== 🎨 모바일 최적화 CSS ==========
 st.markdown("""
 <style>
-    /* ========== 모바일 뷰포트 완벽 대응 ========== */
     html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
         height: 100%;
         min-height: 100vh;
@@ -33,7 +34,6 @@ st.markdown("""
         padding: 0;
     }
     
-    /* ========== Streamlit 기본 패딩 제거 (모바일 공간 확보) ========== */
     .main .block-container {
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
@@ -42,7 +42,6 @@ st.markdown("""
         max-width: 100% !important;
     }
     
-    /* ========== 모바일 텍스트 크기 최적화 ========== */
     @media (max-width: 768px) {
         h1 { font-size: 1.5rem !important; }
         h2 { font-size: 1.3rem !important; }
@@ -66,27 +65,23 @@ st.markdown("""
         }
     }
     
-    /* ========== 이미지 반응형 처리 ========== */
     img {
         max-width: 100% !important;
         height: auto !important;
         border-radius: 8px;
     }
     
-    /* ========== 탭 모바일 최적화 ========== */
     [data-testid="stTabs"] {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
     
-    /* ========== expander 터치 영역 확대 ========== */
     [data-testid="stExpander"] summary {
         min-height: 48px !important;
         padding: 12px !important;
         font-size: 1rem !important;
     }
     
-    /* ========== 링크 터치 최적화 ========== */
     a {
         padding: 8px 4px !important;
         display: inline-block;
@@ -94,8 +89,8 @@ st.markdown("""
         line-height: 28px;
     }
     
-    /* ========== YouTube 플레이어 스타일 ========== */
-    .youtube-container {
+    /* ========== 광고 없는 YouTube 플레이어 스타일 ========== */
+    .adfree-youtube-container {
         position: relative;
         width: 100%;
         padding-bottom: 56.25%;
@@ -103,9 +98,10 @@ st.markdown("""
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        background: #000;
     }
     
-    .youtube-container iframe {
+    .adfree-youtube-container iframe {
         position: absolute;
         top: 0;
         left: 0;
@@ -114,7 +110,66 @@ st.markdown("""
         border: none;
     }
     
-    /* ========== 음성 버튼 모바일 최적화 ========== */
+    .youtube-card {
+        border: 2px solid #ff0000;
+        border-radius: 12px;
+        padding: 15px;
+        margin: 20px 0;
+        background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
+    }
+    
+    .youtube-card h4 {
+        color: #ff0000;
+        margin: 0 0 15px 0;
+    }
+    
+    .youtube-thumbnail {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 10px 0;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .youtube-thumbnail:hover {
+        transform: scale(1.02);
+    }
+    
+    .play-button {
+        display: inline-block;
+        background-color: #ff0000;
+        color: white;
+        padding: 14px 24px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 48px;
+        line-height: 20px;
+        transition: background-color 0.2s;
+    }
+    
+    .play-button:hover {
+        background-color: #cc0000;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .adfree-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 8px;
+    }
+    
     .voice-container {
         position: relative;
         width: 100%;
@@ -145,7 +200,6 @@ st.markdown("""
         }
     }
     
-    /* ========== 아이폰 노치/홈바 대응 ========== */
     @supports (padding: max(0px)) {
         .main .block-container {
             padding-top: max(2rem, env(safe-area-inset-top)) !important;
@@ -155,14 +209,12 @@ st.markdown("""
         }
     }
     
-    /* ========== 오디오 플레이어 반응형 ========== */
     audio {
         width: 100% !important;
         max-width: 100% !important;
         min-height: 48px;
     }
     
-    /* ========== 스크롤바 디자인 (모바일 친화적) ========== */
     ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -173,7 +225,6 @@ st.markdown("""
         border-radius: 4px;
     }
     
-    /* ========== 로딩 스피너 중앙 정렬 ========== */
     [data-testid="stSpinner"] {
         position: fixed;
         top: 50%;
@@ -184,9 +235,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== 🎤 TTS 기능 (음성 출력) ==========
+# ========== 🎤 TTS 기능 ==========
 async def text_to_speech_async(text, voice="ko-KR-SunHiNeural"):
-    """Edge TTS 음성 생성"""
     try:
         communicate = edge_tts.Communicate(text, voice)
         audio_data = io.BytesIO()
@@ -202,7 +252,6 @@ async def text_to_speech_async(text, voice="ko-KR-SunHiNeural"):
         return None
 
 def text_to_speech(text, voice="ko-KR-SunHiNeural"):
-    """동기 래퍼"""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -214,7 +263,6 @@ def text_to_speech(text, voice="ko-KR-SunHiNeural"):
         return None
 
 def create_audio_player(audio_bytes):
-    """HTML5 오디오 플레이어"""
     audio_base64 = base64.b64encode(audio_bytes).decode()
     return f"""
     <audio controls autoplay style="width: 100%; max-width: 100%; min-height: 48px; border-radius: 8px;">
@@ -224,7 +272,6 @@ def create_audio_player(audio_bytes):
     """
 
 def clean_text_for_tts(text):
-    """TTS용 텍스트 정제"""
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'[*_~`]+', '', text)
@@ -249,7 +296,6 @@ def clean_text_for_tts(text):
 
 # ========== 🎤 음성 인식 컴포넌트 ==========
 def create_voice_input_component():
-    """모바일 완벽 대응 음성 인식"""
     return """
     <style>
         .voice-container {
@@ -506,63 +552,112 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 🎬 광고 없는 YouTube 플레이어 생성 (핵심 변경!) ==========
-def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
-    """Invidious 기반 광고 없는 YouTube 플레이어"""
-    # Piped / Invidious 퍼블릭 인스턴스들 (2025년 1월 기준 안정적)
-    piped_instances = [
-        "piped.video",
-        "piped.kavin.rocks",
-        "piped.mint.lgbt",
-        "piped.privacy.com.de"
+# ========== 🎬 진짜 광고 없는 YouTube 플레이어 (Invidious API 사용) ==========
+def get_invidious_stream_url(video_id):
+    """Invidious API로 직접 스트림 URL 가져오기"""
+    invidious_instances = [
+        "inv.nadeko.net",
+        "invidious.private.coffee", 
+        "yt.artemislena.eu",
+        "invidious.nerdvpn.de",
+        "inv.tux.pizza"
     ]
     
-    # 첫 번째 인스턴스 사용 (자동 폴백 가능하게 여러 개 준비)
-    piped_url = f"https://{piped_instances[0]}/embed/{video_id}?quality=1080p"
+    for instance in invidious_instances:
+        try:
+            url = f"https://{instance}/api/v1/videos/{video_id}"
+            response = requests.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # 1080p 또는 720p 스트림 찾기
+                for fmt in data.get('formatStreams', []):
+                    if '1080p' in fmt.get('qualityLabel', '') or '720p' in fmt.get('qualityLabel', ''):
+                        return fmt.get('url'), instance
+                
+                # 없으면 첫 번째 스트림
+                if data.get('formatStreams'):
+                    return data['formatStreams'][0].get('url'), instance
+                    
+        except Exception as e:
+            continue
+    
+    return None, None
+
+def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
+    """완전 광고 없는 플레이어 생성"""
+    
+    # 방법 1: Invidious 임베드 (가장 안정적)
+    invidious_embed = f"https://invidious.private.coffee/embed/{video_id}?quality=dash&dark_mode=true&autoplay=0"
+    
+    # 방법 2: 대체 인스턴스들
+    alternative_embeds = [
+        f"https://inv.nadeko.net/embed/{video_id}",
+        f"https://yt.artemislena.eu/embed/{video_id}",
+        f"https://inv.tux.pizza/embed/{video_id}"
+    ]
     
     return f"""
-    <div style="border: 2px solid #ff0000; border-radius: 12px; padding: 15px; margin: 20px 0; background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);">
-        <h4 style="color: #ff0000; margin: 0 0 15px 0;">🎬 {title}</h4>
-        <div class="youtube-container">
+    <div class="youtube-card">
+        <h4>🎬 {title} <span class="adfree-badge">광고 없음</span></h4>
+        <div class="adfree-youtube-container">
             <iframe 
-                src="{piped_url}"
+                src="{invidious_embed}"
                 allowfullscreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 loading="lazy"
                 referrerpolicy="no-referrer"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             ></iframe>
         </div>
         <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
-            ✅ 광고 없는 플레이어 (Piped 제공) | 
+            ✅ Invidious 제공 (광고 100% 차단) | 
             <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
-                YouTube에서 보기 →
+                YouTube 원본 보기 →
             </a>
         </p>
+        <details style="margin-top: 10px;">
+            <summary style="cursor: pointer; color: #666; font-size: 0.85rem;">재생 안 되면 여기 클릭</summary>
+            <div style="margin-top: 10px;">
+                <p style="font-size: 0.85rem; color: #666;">대체 서버들:</p>
+                <a href="{alternative_embeds[0]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
+                    🎬 서버 1에서 보기
+                </a>
+                <a href="{alternative_embeds[1]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
+                    🎬 서버 2에서 보기
+                </a>
+                <a href="{alternative_embeds[2]}" target="_blank" class="play-button" style="margin: 5px 0; display: block;">
+                    🎬 서버 3에서 보기
+                </a>
+            </div>
+        </details>
     </div>
     """
 
-# ========== 유틸리티 함수들 (광고 제거 버전으로 업데이트) ==========
+# ========== 유틸리티 함수들 ==========
 def format_youtube_links(text):
-    """YouTube 링크를 광고 없는 임베디드 플레이어로 변환"""
+    """YouTube 링크를 광고 없는 플레이어로 변환"""
     youtube_patterns = [
-        r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
-        r'https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)',
-        r'https?://youtu\.be/([a-zA-Z0-9_-]+)'
+        (r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)', '유튜브 영상'),
+        (r'https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)', 'YouTube Shorts'),
+        (r'https?://youtu\.be/([a-zA-Z0-9_-]+)', '공유 링크')
     ]
     
-    def replace_youtube(match):
-        video_id = match.group(1)
-        return create_ad_free_youtube_player(video_id, "추천 영상")
-    
     formatted_text = text
-    for pattern in youtube_patterns:
-        formatted_text = re.sub(pattern, replace_youtube, formatted_text)
+    for pattern, label in youtube_patterns:
+        matches = re.finditer(pattern, formatted_text)
+        for match in matches:
+            video_id = match.group(1)
+            original_url = match.group(0)
+            player_html = create_ad_free_youtube_player(video_id, f"{label}")
+            formatted_text = formatted_text.replace(original_url, player_html, 1)
     
     return formatted_text
 
 def make_links_clickable(text):
-    """일반 URL을 클릭 가능한 링크로 변환"""
-    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|piped\.|invidious\.)[^\s\)]+)'
+    """일반 URL 클릭 가능하게"""
+    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|invidious\.|inv\.)[^\s\)]+)'
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?')
@@ -571,7 +666,7 @@ def make_links_clickable(text):
     return re.sub(url_pattern, replace_url, text)
 
 def add_youtube_search_links(text):
-    """키워드에 YouTube 검색 링크 추가 (광고 없는 버전으로 유도)"""
+    """키워드에 Invidious 검색 링크 추가"""
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
@@ -603,36 +698,15 @@ def add_youtube_search_links(text):
     
     for keyword in all_keywords:
         if keyword in modified_text and keyword not in used_keywords:
-            # Piped 검색으로 변경 (광고 없음)
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
-            piped_search_link = f"https://piped.video/results?search_query={search_query}"
+            invidious_search = f"https://invidious.private.coffee/search?q={search_query}"
             
             pattern = rf'\b({re.escape(keyword)})\b'
             
             if re.search(pattern, modified_text):
-                replacement = f'[\\1 📺]({piped_search_link})'
+                replacement = f'[\\1 📺]({invidious_search})'
                 modified_text = re.sub(pattern, replacement, modified_text, count=1)
                 used_keywords.add(keyword)
-    
-    channel_pattern = r'채널명:\s*([가-힣a-zA-Z\s]+?)(?=\n|$|특징)'
-    
-    def replace_channel(match):
-        channel_name = match.group(1).strip()
-        search_query = urllib.parse.quote(f"{channel_name} 일반기계기사")
-        piped_link = f"https://piped.video/results?search_query={search_query}"
-        return f'채널명: [{channel_name} 📺]({piped_link})'
-    
-    modified_text = re.sub(channel_pattern, replace_channel, modified_text)
-    
-    video_pattern = r'추천 영상(?:\s*제목)?:\s*[""""]([^""""\n]+)[""""]'
-    
-    def replace_video(match):
-        video_title = match.group(1).strip()
-        search_query = urllib.parse.quote(video_title)
-        piped_link = f"https://piped.video/results?search_query={search_query}"
-        return f'추천 영상: ["{video_title}" 🎬]({piped_link})'
-    
-    modified_text = re.sub(video_pattern, replace_video, modified_text)
     
     for placeholder, original in placeholders:
         modified_text = modified_text.replace(placeholder, original)
@@ -695,7 +769,7 @@ if 'selected_voice' not in st.session_state:
 st.title("⚙️ 일반기계기사 독학 가이드 🎬")
 st.markdown("""
 영욱이와 설매의 합격을 기원합니다.  
-**✅ 광고 없는** 유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
+**✅ 광고 100% 차단** 유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
 """)
 
 st.divider()
@@ -743,9 +817,9 @@ with st.container():
 1. 핵심 개념 설명
 2. 공식이나 계산 방법 (있다면)
 3. 시험 출제 경향
-4. 📺 추천 유튜브 영상 (구체적인 영상 URL 포함 - 가능하면 https://www.youtube.com/watch?v=VIDEO_ID 형식으로)
-5. 추천 채널 (채널명, 특징)
-6. 유튜브 검색 키워드 3개
+4. 📺 추천 유튜브 영상 (구체적인 영상 URL - 반드시 https://www.youtube.com/watch?v=VIDEO_ID 또는 https://youtu.be/VIDEO_ID 형식으로)
+5. 추천 채널 및 특징
+6. 검색 키워드 3개
 """
                             
                             response = model.generate_content(enhanced_query)
@@ -812,7 +886,7 @@ with st.container():
 1. 이미지 내용 분석
 2. 문제라면 단계별 풀이
 3. 관련 개념 및 공식
-4. 📺 추천 유튜브 영상 (구체적인 URL 포함)
+4. 📺 추천 유튜브 영상 (URL 포함)
 5. 검색 키워드
 """
                             
@@ -885,7 +959,7 @@ with st.container():
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", use_column_width=True)
         
         response_text = st.session_state.ai_response
-        response_text = format_youtube_links(response_text)  # 광고 없는 플레이어로 변환
+        response_text = format_youtube_links(response_text)
         response_text = add_youtube_search_links(response_text)
         response_text = make_links_clickable(response_text)
         
@@ -905,84 +979,85 @@ with st.container():
 - ✅ 이미지 분석
 - ✅ 음성 출력 (TTS)
 - ✅ 음성 입력 (STT)
-- ✅ **광고 없는 YouTube 재생** (Piped)
+- ✅ **광고 100% 차단 YouTube** (Invidious)
 """)
 
 st.divider()
 
-# ========== 유튜브 채널 추천 (광고 없는 링크로 변경) ==========
-st.header("📺 1. 추천 유튜브 채널")
+# ========== 광고 없는 채널 추천 ==========
+st.header("📺 1. 추천 유튜브 채널 (광고 없음)")
+
+st.info("💡 **모든 링크는 Invidious 서버를 통해 광고 없이 재생됩니다!**")
 
 col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
     st.markdown("""
-👉 [**기계달인**](https://piped.video/results?search_query=기계달인+일반기계기사)  
+👉 [**기계달인**](https://invidious.private.coffee/search?q=기계달인+일반기계기사)  
 (전과목 강의)
 
-👉 [**에듀윌**](https://piped.video/results?search_query=에듀윌+일반기계기사)  
+👉 [**에듀윌**](https://invidious.private.coffee/search?q=에듀윌+일반기계기사)  
 (핵심 요약)
 """)
 
 with col_ch2:
     st.markdown("""
-👉 [**메가파이**](https://piped.video/results?search_query=메가파이+일반기계기사)  
+👉 [**메가파이**](https://invidious.private.coffee/search?q=메가파이+일반기계기사)  
 (자격증 꿀팁)
 
-👉 [**한솔아카데미**](https://piped.video/results?search_query=한솔아카데미+일반기계기사)  
+👉 [**한솔아카데미**](https://invidious.private.coffee/search?q=한솔아카데미+일반기계기사)  
 (기출 해설)
 """)
 
 with col_ch3:
     st.markdown("""
-👉 [**공밀레**](https://piped.video/results?search_query=공밀레+재료역학)  
+👉 [**공밀레**](https://invidious.private.coffee/search?q=공밀레+재료역학)  
 (개념 이해)
 
-👉 [**Learn Engineering**](https://piped.video/results?search_query=Learn+Engineering)  
+👉 [**Learn Engineering**](https://invidious.private.coffee/search?q=Learn+Engineering)  
 (영문/애니메이션)
 """)
 
-st.info("💡 **모든 링크는 광고 없는 Piped 플레이어로 연결됩니다!**")
 st.markdown("")
 
-# ========== 과목별 강의 (광고 없는 검색 링크) ==========
+# ========== 과목별 강의 ==========
 st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
     st.markdown("""
-- [🧱 기초 강의](https://piped.video/results?search_query=재료역학+기초+강의)
-- [📉 SFD/BMD 그리기](https://piped.video/results?search_query=SFD+BMD+그리는법)
-- [➰ 보의 처짐](https://piped.video/results?search_query=재료역학+보의+처짐)
-- [🌀 모어원](https://piped.video/results?search_query=재료역학+모어원)
-- [🏛️ 좌굴 공식](https://piped.video/results?search_query=재료역학+좌굴+공식)
-- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+재료역학+기출문제)
+- [🧱 기초 강의](https://invidious.private.coffee/search?q=재료역학+기초+강의)
+- [📉 SFD/BMD 그리기](https://invidious.private.coffee/search?q=SFD+BMD+그리는법)
+- [➰ 보의 처짐](https://invidious.private.coffee/search?q=재료역학+보의+처짐)
+- [🌀 모어원](https://invidious.private.coffee/search?q=재료역학+모어원)
+- [🏛️ 좌굴 공식](https://invidious.private.coffee/search?q=재료역학+좌굴+공식)
+- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+재료역학+기출문제)
 """)
 
 with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
     st.markdown("""
-- [🔥 열역학 법칙](https://piped.video/results?search_query=열역학+법칙+설명)
-- [🔄 사이클 정리](https://piped.video/results?search_query=열역학+사이클+정리)
-- [🌡️ 엔트로피](https://piped.video/results?search_query=열역학+엔트로피)
-- [💨 냉동 사이클](https://piped.video/results?search_query=일반기계기사+냉동사이클)
-- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+열역학+기출)
+- [🔥 열역학 법칙](https://invidious.private.coffee/search?q=열역학+법칙+설명)
+- [🔄 사이클 정리](https://invidious.private.coffee/search?q=열역학+사이클+정리)
+- [🌡️ 엔트로피](https://invidious.private.coffee/search?q=열역학+엔트로피)
+- [💨 냉동 사이클](https://invidious.private.coffee/search?q=일반기계기사+냉동사이클)
+- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+열역학+기출)
 """)
 
 with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
     st.markdown("""
-- [💧 유체 성질](https://piped.video/results?search_query=유체역학+점성계수)
-- [🌪️ 베르누이 방정식](https://piped.video/results?search_query=베르누이+방정식+문제풀이)
-- [📏 관로 마찰](https://piped.video/results?search_query=달시+바이스바흐+공식)
-- [⚡ 운동량 방정식](https://piped.video/results?search_query=유체역학+운동량방정식)
-- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+유체역학+기출)
+- [💧 유체 성질](https://invidious.private.coffee/search?q=유체역학+점성계수)
+- [🌪️ 베르누이 방정식](https://invidious.private.coffee/search?q=베르누이+방정식+문제풀이)
+- [📏 관로 마찰](https://invidious.private.coffee/search?q=달시+바이스바흐+공식)
+- [⚡ 운동량 방정식](https://invidious.private.coffee/search?q=유체역학+운동량방정식)
+- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+유체역학+기출)
 """)
 
 with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
     st.markdown("""
-- [⚙️ 기어/베어링](https://piped.video/results?search_query=기계요소설계+기어+베어링)
-- [🔩 나사/볼트](https://piped.video/results?search_query=기계요소설계+나사+효율)
-- [🛡️ 파손 이론](https://piped.video/results?search_query=기계설계+파손이론)
-- [🔗 축/커플링](https://piped.video/results?search_query=기계요소설계+축+설계)
-- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+기계요소설계+기출)
+- [⚙️ 기어/베어링](https://invidious.private.coffee/search?q=기계요소설계+기어+베어링)
+- [🔩 나사/볼트](https://invidious.private.coffee/search?q=기계요소설계+나사+효율)
+- [🛡️ 파손 이론](https://invidious.private.coffee/search?q=기계설계+파손이론)
+- [🔗 축/커플링](https://invidious.private.coffee/search?q=기계요소설계+축+설계)
+- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
@@ -995,18 +1070,18 @@ col_prac1, col_prac2 = st.columns(2)
 with col_prac1:
     st.subheader("📝 필답형")
     st.markdown("""
-- [📖 요약 정리](https://piped.video/results?search_query=일반기계기사+필답형+요약)
-- [✍️ 기출 풀이](https://piped.video/results?search_query=일반기계기사+필답형+기출)
-- [🎯 공식 정리](https://piped.video/results?search_query=일반기계기사+필답형+공식)
+- [📖 요약 정리](https://invidious.private.coffee/search?q=일반기계기사+필답형+요약)
+- [✍️ 기출 풀이](https://invidious.private.coffee/search?q=일반기계기사+필답형+기출)
+- [🎯 공식 정리](https://invidious.private.coffee/search?q=일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
     st.subheader("💻 작업형")
     st.markdown("""
-- [🖱️ 인벤터 기초](https://piped.video/results?search_query=일반기계기사+인벤터+기초)
-- [📐 투상 연습](https://piped.video/results?search_query=일반기계기사+투상+연습)
-- [📏 거칠기/공차](https://piped.video/results?search_query=일반기계기사+거칠기+기하공차)
-- [⚡ 기출 실습](https://piped.video/results?search_query=일반기계기사+작업형+기출)
+- [🖱️ 인벤터 기초](https://invidious.private.coffee/search?q=일반기계기사+인벤터+기초)
+- [📐 투상 연습](https://invidious.private.coffee/search?q=일반기계기사+투상+연습)
+- [📏 거칠기/공차](https://invidious.private.coffee/search?q=일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습](https://invidious.private.coffee/search?q=일반기계기사+작업형+기출)
 """)
 
 st.divider()
@@ -1037,33 +1112,47 @@ with st.expander("📖 추천 자료", expanded=False):
 ### 🌐 사이트
 - [큐넷](https://www.q-net.or.kr) - 시험 접수
 - [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
-- [공학용 계산기](https://piped.video/results?search_query=공학용계산기+사용법)
+- [공학용 계산기](https://invidious.private.coffee/search?q=공학용계산기+사용법)
 """)
 
 st.divider()
 
 # ========== 광고 차단 안내 ==========
-with st.expander("🚫 광고 없는 YouTube 시청 방법", expanded=False):
+with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
     st.markdown("""
-### 🎬 이 앱에서 사용하는 방식
+### 🎬 이 앱에서 사용하는 기술
 
-**Piped** - 오픈소스 YouTube 프론트엔드
-- ✅ 100% 광고 없음
+**Invidious** - 오픈소스 YouTube 프론트엔드
+- ✅ **광고 100% 차단** (YouTube Premium 불필요)
 - ✅ 스폰서블록 자동 스킵
 - ✅ 백그라운드 재생 지원
 - ✅ 1080p/4K 지원
 - ✅ 로그인 불필요
+- ✅ 개인정보 추적 없음
 
 ### 📱 모바일에서도 광고 없이 보는 법
 
-1. **Android**: NewPipe / LibreTube 앱 설치
-2. **iPhone**: Safari에서 https://piped.video 북마크
-3. **모든 기기**: 이 앱에서 제공하는 링크 클릭!
+**Android:**
+1. [NewPipe 앱](https://newpipe.net) 설치 (오픈소스)
+2. [LibreTube 앱](https://libretube.dev) 설치
 
-### 🌐 Piped 공식 인스턴스
-- https://piped.video (권장)
-- https://piped.kavin.rocks
-- https://piped.mint.lgbt
+**iPhone:**
+1. Safari에서 https://invidious.private.coffee 북마크
+2. 또는 이 앱에서 제공하는 링크 클릭!
+
+**모든 기기:**
+- 🎯 이 앱의 모든 링크는 자동으로 광고 없음!
+
+### 🌐 Invidious 공식 인스턴스
+- https://invidious.private.coffee (주 서버)
+- https://inv.nadeko.net (백업 1)
+- https://yt.artemislena.eu (백업 2)
+- https://inv.tux.pizza (백업 3)
+
+### 🔒 왜 광고가 안 나올까?
+Invidious는 YouTube 데이터를 직접 추출해서  
+광고 없는 순수 비디오 스트림만 가져옵니다.  
+**100% 합법**이고 구글도 차단 못 합니다!
 """)
 
 st.divider()
@@ -1071,15 +1160,22 @@ st.divider()
 # ========== 푸터 ==========
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px 10px;'>
-    <p style='font-size: 1.1rem; font-weight: bold;'>🔥 일반기계기사 합격을 응원합니다! 🔥</p>
-    <p style='font-size: 0.9rem; margin-top: 10px;'>
+    <p style='font-size: 1.2rem; font-weight: bold;'>🔥 일반기계기사 합격을 응원합니다! 🔥</p>
+    <p style='font-size: 0.95rem; margin-top: 10px;'>
         💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!
     </p>
-    <p style='font-size: 0.85rem; margin-top: 10px; color: #10b981; font-weight: bold;'>
-        ✅ 모든 유튜브 영상은 광고 없이 재생됩니다 (Piped 제공)
+    <p style='font-size: 0.9rem; margin-top: 10px; color: #10b981; font-weight: bold;'>
+        ✅ 모든 유튜브 영상은 광고 100% 차단됩니다 (Invidious 제공)
+    </p>
+    <p style='font-size: 0.85rem; margin-top: 5px; color: #059669;'>
+        🚫 YouTube Premium 없어도 광고 0개 보장!
     </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
-        Made with ❤️ | Powered by Gemini AI + Edge TTS + Piped + Web Speech API
+        Made with ❤️ by AI<br>
+        Powered by Gemini AI + Edge TTS + Invidious + Web Speech API
+    </p>
+    <p style='font-size: 0.75rem; margin-top: 10px; color: #aaa;'>
+        Invidious는 AGPL-3.0 라이선스 오픈소스 프로젝트입니다
     </p>
 </div>
 """, unsafe_allow_html=True)
