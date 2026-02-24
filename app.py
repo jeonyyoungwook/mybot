@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ========== 프리미엄 CSS 스타일 ==========
+# ========== 프리미엄 CSS 스타일 (부드러운 배경) ==========
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap');
@@ -26,115 +26,330 @@ st.markdown("""
         font-family: 'Noto Sans KR', sans-serif;
     }
 
+    .stApp {
+        background: linear-gradient(180deg, #f8f9fe 0%, #eef1f8 50%, #e8ecf4 100%);
+    }
+
     .main .block-container {
         padding: 1.5rem 1rem;
         max-width: 1200px;
     }
 
-    /* ===== 히어로 섹션 ===== */
+    /* ===== 히어로 섹션 (부드러운 색상) ===== */
     .hero-section {
-        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-        border-radius: 24px;
-        padding: 50px 40px;
-        margin: 0 0 30px 0;
+        background: linear-gradient(135deg, #e8f4f8 0%, #d4e5f7 50%, #c9daf8 100%);
+        border-radius: 28px;
+        padding: 55px 45px;
+        margin: 0 0 35px 0;
         text-align: center;
         position: relative;
         overflow: hidden;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        box-shadow: 0 15px 50px rgba(100,120,180,0.12);
+        border: 1px solid rgba(255,255,255,0.8);
     }
 
     .hero-section::before {
         content: '';
         position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(102,126,234,0.1) 0%, transparent 50%);
-        animation: heroGlow 8s ease-in-out infinite;
+        top: -100px;
+        right: -100px;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(255,255,255,0.6) 0%, transparent 70%);
+        border-radius: 50%;
     }
 
-    @keyframes heroGlow {
-        0%, 100% { transform: translate(0, 0); }
-        50% { transform: translate(30px, -30px); }
+    .hero-section::after {
+        content: '';
+        position: absolute;
+        bottom: -50px;
+        left: -50px;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(147,197,253,0.3) 0%, transparent 70%);
+        border-radius: 50%;
     }
 
     .hero-title {
-        font-size: 2.8rem;
+        font-size: 2.6rem;
         font-weight: 900;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 30%, #f093fb 60%, #f5576c 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin: 0 0 15px 0;
+        color: #1e3a5f;
+        margin: 0 0 18px 0;
         position: relative;
         z-index: 1;
-        letter-spacing: -1px;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
 
     .hero-subtitle {
-        color: rgba(255,255,255,0.8);
-        font-size: 1.15rem;
-        font-weight: 400;
-        margin: 0 0 10px 0;
+        color: #4a6d8c;
+        font-size: 1.12rem;
+        font-weight: 500;
+        margin: 0 0 12px 0;
         position: relative;
         z-index: 1;
-        line-height: 1.8;
+        line-height: 1.9;
     }
 
     .hero-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, #3b82f6, #6366f1);
         color: white;
-        padding: 8px 24px;
+        padding: 10px 28px;
         border-radius: 50px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-top: 15px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        margin-top: 18px;
         position: relative;
         z-index: 1;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
+        box-shadow: 0 4px 15px rgba(99,102,241,0.3);
     }
 
     /* ===== 섹션 헤더 ===== */
     .section-header {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin: 35px 0 20px 0;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #eef2ff;
+        gap: 14px;
+        margin: 40px 0 22px 0;
+        padding-bottom: 14px;
+        border-bottom: 2px solid rgba(99,102,241,0.15);
     }
 
     .section-header h2 {
         margin: 0;
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #1e1b4b;
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #1e3a5f;
     }
 
     .section-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.4rem;
+        font-size: 1.5rem;
         flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
 
-    .section-icon.ai { background: linear-gradient(135deg, #667eea, #764ba2); }
-    .section-icon.youtube { background: linear-gradient(135deg, #ff0000, #cc0000); }
+    .section-icon.ai { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    .section-icon.youtube { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .section-icon.study { background: linear-gradient(135deg, #10b981, #059669); }
     .section-icon.exam { background: linear-gradient(135deg, #f59e0b, #d97706); }
 
+    /* ===== 프리미엄 음성 인식 ===== */
+    .voice-premium-container {
+        background: linear-gradient(145deg, #ffffff 0%, #f8faff 100%);
+        border-radius: 24px;
+        padding: 35px;
+        margin: 20px 0;
+        box-shadow: 
+            0 20px 60px rgba(99,102,241,0.1),
+            0 1px 3px rgba(0,0,0,0.05),
+            inset 0 1px 0 rgba(255,255,255,0.9);
+        border: 1px solid rgba(99,102,241,0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .voice-premium-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
+    }
+
+    .voice-premium-container::after {
+        content: '';
+        position: absolute;
+        top: -80px;
+        right: -80px;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(99,102,241,0.05) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+
+    .voice-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 25px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .voice-icon-wrapper {
+        width: 52px;
+        height: 52px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        box-shadow: 0 8px 20px rgba(99,102,241,0.3);
+    }
+
+    .voice-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .voice-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 3px 0 0 0;
+    }
+
+    #voiceBtn {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 22px 35px;
+        font-size: 1.15rem;
+        border-radius: 16px;
+        cursor: pointer;
+        box-shadow: 
+            0 10px 30px rgba(99,102,241,0.35),
+            0 2px 4px rgba(99,102,241,0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 700;
+        width: 100%;
+        min-height: 68px;
+        position: relative;
+        z-index: 1;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    #voiceBtn:hover {
+        transform: translateY(-3px);
+        box-shadow: 
+            0 15px 40px rgba(99,102,241,0.4),
+            0 5px 10px rgba(99,102,241,0.2);
+    }
+
+    #voiceBtn:active {
+        transform: translateY(-1px);
+    }
+
+    #voiceBtn.recording {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        box-shadow: 
+            0 10px 30px rgba(239,68,68,0.4),
+            0 0 0 4px rgba(239,68,68,0.2);
+        animation: recording-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes recording-pulse {
+        0%, 100% { 
+            box-shadow: 
+                0 10px 30px rgba(239,68,68,0.4),
+                0 0 0 4px rgba(239,68,68,0.2);
+        }
+        50% { 
+            box-shadow: 
+                0 10px 30px rgba(239,68,68,0.5),
+                0 0 0 12px rgba(239,68,68,0.1);
+        }
+    }
+
+    #micIcon {
+        font-size: 1.5rem;
+    }
+
+    #status {
+        color: #475569;
+        text-align: center;
+        font-size: 0.95rem;
+        margin-top: 18px;
+        min-height: 28px;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
+        padding: 12px;
+        background: rgba(99,102,241,0.05);
+        border-radius: 12px;
+    }
+
+    #result-box {
+        display: none;
+        background: linear-gradient(145deg, #f0fdf4 0%, #ecfdf5 100%);
+        color: #166534;
+        padding: 22px;
+        border-radius: 16px;
+        margin-top: 18px;
+        box-shadow: 
+            0 8px 25px rgba(16,185,129,0.1),
+            inset 0 1px 0 rgba(255,255,255,0.8);
+        border: 1px solid rgba(16,185,129,0.2);
+        position: relative;
+        z-index: 1;
+    }
+
+    #result-box.show {
+        display: block;
+        animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    #finalResult {
+        font-size: 1.1rem;
+        line-height: 1.7;
+        margin-bottom: 15px;
+        padding: 18px;
+        background: white;
+        border-radius: 12px;
+        border-left: 4px solid #10b981;
+        color: #1e293b;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .copy-btn {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+        padding: 16px 28px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 700;
+        width: 100%;
+        margin-top: 10px;
+        min-height: 52px;
+        font-size: 1rem;
+        transition: all 0.3s;
+        letter-spacing: 0.5px;
+        box-shadow: 0 6px 20px rgba(16,185,129,0.3);
+    }
+
+    .copy-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(16,185,129,0.4);
+    }
+
     /* ===== 카드 시스템 ===== */
     .glass-card {
-        background: rgba(255, 255, 255, 0.85);
+        background: rgba(255, 255, 255, 0.9);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.5);
         border-radius: 20px;
         padding: 28px;
         margin: 15px 0;
@@ -147,41 +362,13 @@ st.markdown("""
         transform: translateY(-2px);
     }
 
-    .gradient-card {
-        border-radius: 20px;
-        padding: 28px;
-        margin: 15px 0;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.12);
-        color: white;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .gradient-card::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 150px;
-        height: 150px;
-        background: rgba(255,255,255,0.08);
-        border-radius: 50%;
-        transform: translate(30%, -30%);
-    }
-
-    .gradient-card.purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .gradient-card.pink { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-    .gradient-card.green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
-    .gradient-card.orange { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-    .gradient-card.dark { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
-
     /* ===== YouTube 카드 ===== */
     .youtube-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         border-radius: 20px;
         padding: 24px;
         margin: 15px 0;
-        box-shadow: 0 10px 40px rgba(102,126,234,0.3);
+        box-shadow: 0 12px 40px rgba(99,102,241,0.25);
         color: white;
         position: relative;
         overflow: hidden;
@@ -194,7 +381,7 @@ st.markdown("""
         right: -30px;
         width: 120px;
         height: 120px;
-        background: rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.1);
         border-radius: 50%;
     }
 
@@ -226,7 +413,7 @@ st.markdown("""
     .play-button {
         display: block;
         background: white;
-        color: #667eea;
+        color: #6366f1;
         padding: 16px;
         border-radius: 12px;
         text-align: center;
@@ -245,7 +432,7 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0,0,0,0.2);
         text-decoration: none;
-        color: #667eea;
+        color: #6366f1;
     }
 
     .server-links {
@@ -277,210 +464,124 @@ st.markdown("""
         text-decoration: none;
     }
 
-    /* ===== 음성 인식 ===== */
-    .voice-container {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px;
-        padding: 30px;
-        margin: 15px 0;
-        box-shadow: 0 10px 40px rgba(102,126,234,0.3);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .voice-container::before {
-        content: '';
-        position: absolute;
-        top: -50px;
-        right: -50px;
-        width: 150px;
-        height: 150px;
-        background: rgba(255,255,255,0.06);
-        border-radius: 50%;
-    }
-
-    #voiceBtn {
-        background: white;
-        color: #667eea;
-        border: none;
-        padding: 18px 30px;
-        font-size: 1.15rem;
-        border-radius: 14px;
-        cursor: pointer;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-        transition: all 0.3s;
-        font-weight: 700;
-        width: 100%;
-        min-height: 60px;
-        position: relative;
-        z-index: 1;
-        letter-spacing: 0.5px;
-    }
-
-    #voiceBtn:hover {
-        transform: scale(1.02);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-    }
-
-    #voiceBtn.recording {
-        background: linear-gradient(135deg, #ff3d00, #ff6e40);
-        color: white;
-        animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(255,61,0,0.5); }
-        50% { box-shadow: 0 0 0 18px rgba(255,61,0,0); }
-    }
-
-    #status {
-        color: rgba(255,255,255,0.9);
-        text-align: center;
-        font-size: 0.95rem;
-        margin-top: 15px;
-        min-height: 30px;
-        font-weight: 500;
-        position: relative;
-        z-index: 1;
-    }
-
-    #result-box {
-        display: none;
-        background: white;
-        color: #333;
-        padding: 20px;
-        border-radius: 14px;
-        margin-top: 15px;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-        position: relative;
-        z-index: 1;
-    }
-
-    #result-box.show {
-        display: block;
-    }
-
-    #finalResult {
-        font-size: 1.05rem;
-        line-height: 1.7;
-        margin-bottom: 12px;
-        padding: 15px;
-        background: #f5f3ff;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-        color: #1e1b4b;
-        font-weight: 500;
-    }
-
-    .copy-btn {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        padding: 14px 24px;
-        border-radius: 10px;
-        cursor: pointer;
-        font-weight: 700;
-        width: 100%;
-        margin-top: 8px;
-        min-height: 48px;
-        font-size: 1rem;
-        transition: all 0.3s;
-        letter-spacing: 0.5px;
-    }
-
-    .copy-btn:hover {
-        transform: scale(1.02);
-        box-shadow: 0 6px 20px rgba(102,126,234,0.4);
-    }
-
     /* ===== AI 응답 ===== */
     .ai-response {
         background: white;
         border-radius: 20px;
-        padding: 30px;
+        padding: 32px;
         margin: 20px 0;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.06);
-        border: 1px solid #eef2ff;
-        line-height: 1.9;
-        font-size: 1rem;
-        color: #1e1b4b;
+        box-shadow: 
+            0 10px 40px rgba(0,0,0,0.06),
+            0 1px 3px rgba(0,0,0,0.03);
+        border: 1px solid rgba(99,102,241,0.1);
+        line-height: 2;
+        font-size: 1.02rem;
+        color: #1e293b;
     }
 
     .ai-response h1, .ai-response h2, .ai-response h3 {
         color: #4338ca;
-        margin-top: 20px;
+        margin-top: 24px;
+        font-weight: 700;
     }
 
+    .ai-response h1 { font-size: 1.5rem; }
+    .ai-response h2 { font-size: 1.3rem; }
+    .ai-response h3 { font-size: 1.15rem; }
+
     .ai-response code {
-        background: #f5f3ff;
-        padding: 2px 8px;
+        background: #f1f5f9;
+        padding: 3px 10px;
         border-radius: 6px;
         color: #7c3aed;
-        font-size: 0.9em;
+        font-size: 0.92em;
+        font-weight: 500;
     }
 
     .ai-response pre {
-        background: #1e1b4b;
-        color: #e0e7ff;
-        padding: 20px;
-        border-radius: 12px;
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 22px;
+        border-radius: 14px;
         overflow-x: auto;
+        font-size: 0.9rem;
+        line-height: 1.6;
     }
 
     .ai-response ul, .ai-response ol {
-        padding-left: 24px;
+        padding-left: 26px;
     }
 
     .ai-response li {
-        margin: 8px 0;
+        margin: 10px 0;
     }
 
     .ai-response strong {
         color: #4338ca;
+        font-weight: 700;
     }
 
     .ai-response blockquote {
-        border-left: 4px solid #667eea;
-        padding: 12px 20px;
-        margin: 15px 0;
+        border-left: 4px solid #6366f1;
+        padding: 15px 22px;
+        margin: 18px 0;
         background: #f5f3ff;
-        border-radius: 0 10px 10px 0;
+        border-radius: 0 12px 12px 0;
+        font-style: normal;
+    }
+
+    .ai-response table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+    }
+
+    .ai-response th, .ai-response td {
+        border: 1px solid #e2e8f0;
+        padding: 12px 15px;
+        text-align: left;
+    }
+
+    .ai-response th {
+        background: #f8fafc;
+        font-weight: 700;
+        color: #475569;
     }
 
     /* ===== 채널/정보 카드 ===== */
     .channel-card {
         background: white;
         border-radius: 16px;
-        padding: 20px;
+        padding: 22px;
         margin: 8px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        border: 1px solid #eef2ff;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.04);
         transition: all 0.3s;
     }
 
     .channel-card:hover {
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-        border-color: #c7d2fe;
+        box-shadow: 0 8px 30px rgba(99,102,241,0.12);
+        transform: translateY(-3px);
+        border-color: rgba(99,102,241,0.2);
     }
 
     .channel-card h4 {
-        margin: 0 0 6px 0;
-        font-size: 1rem;
+        margin: 0 0 8px 0;
+        font-size: 1.05rem;
         font-weight: 700;
-        color: #1e1b4b;
+        color: #1e293b;
     }
 
     .channel-card p {
         margin: 0;
-        color: #6b7280;
-        font-size: 0.88rem;
+        color: #64748b;
+        font-size: 0.9rem;
     }
 
     .channel-card a {
-        color: #667eea;
+        color: #6366f1;
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .channel-card a:hover {
@@ -490,33 +591,33 @@ st.markdown("""
 
     .info-card {
         background: white;
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 18px;
+        padding: 26px;
         margin: 10px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        border: 1px solid #eef2ff;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.04);
         transition: all 0.3s;
     }
 
     .info-card:hover {
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 35px rgba(99,102,241,0.1);
         transform: translateY(-2px);
     }
 
     .info-card h3 {
-        color: #1e1b4b;
-        margin: 0 0 15px 0;
-        font-weight: 700;
-        font-size: 1.15rem;
+        color: #1e293b;
+        margin: 0 0 18px 0;
+        font-weight: 800;
+        font-size: 1.18rem;
     }
 
     .info-card p {
-        margin: 8px 0;
-        font-size: 0.95rem;
+        margin: 10px 0;
+        font-size: 0.98rem;
     }
 
     .info-card a {
-        color: #667eea;
+        color: #6366f1;
         text-decoration: none;
         font-weight: 600;
         transition: color 0.2s;
@@ -529,100 +630,116 @@ st.markdown("""
 
     /* ===== 탭 스타일 ===== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        background: #f5f3ff;
-        padding: 5px;
-        border-radius: 14px;
+        gap: 6px;
+        background: #f1f5f9;
+        padding: 6px;
+        border-radius: 16px;
     }
 
     .stTabs [data-baseweb="tab"] {
-        border-radius: 10px;
-        padding: 12px 24px;
+        border-radius: 12px;
+        padding: 14px 28px;
         background: transparent;
         font-weight: 600;
-        color: #6b7280;
+        color: #64748b;
     }
 
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
         color: white !important;
-        box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        box-shadow: 0 4px 15px rgba(99,102,241,0.35);
     }
 
     /* ===== 버튼 스타일 ===== */
     .stButton > button {
         border-radius: 12px;
         font-weight: 600;
-        padding: 10px 24px;
+        padding: 12px 26px;
         transition: all 0.3s;
         border: none;
-        min-height: 48px;
+        min-height: 50px;
     }
 
     .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
     }
 
     /* ===== 인풋 스타일 ===== */
     .stTextInput > div > div > input {
-        border-radius: 12px;
-        border: 2px solid #e0e7ff;
-        padding: 14px 18px;
+        border-radius: 14px;
+        border: 2px solid #e2e8f0;
+        padding: 16px 20px;
         font-size: 1rem;
         transition: all 0.3s;
-        background: #fafaff;
+        background: white;
     }
 
     .stTextInput > div > div > input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
-        background: white;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
     }
 
     /* ===== Expander ===== */
     .streamlit-expanderHeader {
-        border-radius: 12px;
-        background: #f5f3ff;
-        font-weight: 600;
-        color: #1e1b4b;
+        border-radius: 14px;
+        background: #f8fafc;
+        font-weight: 700;
+        color: #1e293b;
+        padding: 12px 16px;
     }
 
     /* ===== 오디오 ===== */
     audio {
         width: 100%;
-        border-radius: 12px;
-        margin: 10px 0;
+        border-radius: 14px;
+        margin: 12px 0;
     }
 
     /* ===== 디바이더 ===== */
     hr {
         border: none;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #c7d2fe, transparent);
-        margin: 30px 0;
+        background: linear-gradient(90deg, transparent, rgba(99,102,241,0.2), transparent);
+        margin: 35px 0;
     }
 
     /* ===== 푸터 ===== */
     .footer-section {
-        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-        border-radius: 24px;
-        padding: 50px 40px;
-        margin: 40px 0 0 0;
+        background: linear-gradient(135deg, #e8f4f8 0%, #d4e5f7 50%, #c9daf8 100%);
+        border-radius: 28px;
+        padding: 55px 45px;
+        margin: 45px 0 0 0;
         text-align: center;
         position: relative;
         overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.8);
+        box-shadow: 0 15px 50px rgba(100,120,180,0.1);
     }
 
     .footer-section::before {
         content: '';
         position: absolute;
-        bottom: -50px;
-        left: -50px;
-        width: 200px;
-        height: 200px;
-        background: rgba(102,126,234,0.1);
+        bottom: -60px;
+        left: -60px;
+        width: 180px;
+        height: 180px;
+        background: rgba(99,102,241,0.06);
         border-radius: 50%;
+    }
+
+    .footer-section h2 {
+        color: #1e3a5f;
+        margin: 0 0 18px 0;
+        font-size: 1.9rem;
+        font-weight: 800;
+        position: relative;
+        z-index: 1;
+    }
+
+    .footer-section p {
+        position: relative;
+        z-index: 1;
     }
 
     /* ===== 반응형 ===== */
@@ -631,41 +748,41 @@ st.markdown("""
             padding: 0.8rem 0.5rem;
         }
         .hero-section {
-            padding: 30px 20px;
-            border-radius: 18px;
+            padding: 35px 22px;
+            border-radius: 20px;
         }
         .hero-title {
-            font-size: 1.8rem !important;
+            font-size: 1.7rem !important;
         }
         .hero-subtitle {
             font-size: 0.95rem;
         }
-        h2 { font-size: 1.4rem !important; }
-        h3 { font-size: 1.2rem !important; }
+        .voice-premium-container {
+            padding: 25px 20px;
+        }
+        h2 { font-size: 1.35rem !important; }
+        h3 { font-size: 1.15rem !important; }
         button { min-height: 48px !important; }
         input, textarea { font-size: 16px !important; }
-        .glass-card, .gradient-card, .ai-response {
-            padding: 18px;
-            border-radius: 16px;
-        }
-        .voice-container {
+        .glass-card, .ai-response {
             padding: 20px;
+            border-radius: 16px;
         }
     }
 
     /* ===== 스크롤바 ===== */
     ::-webkit-scrollbar {
-        width: 6px;
+        width: 7px;
     }
     ::-webkit-scrollbar-track {
-        background: #f5f3ff;
+        background: #f1f5f9;
     }
     ::-webkit-scrollbar-thumb {
         background: #c7d2fe;
-        border-radius: 3px;
+        border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #667eea;
+        background: #6366f1;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -762,27 +879,36 @@ def clean_text_for_tts(text: str) -> str:
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'[*_~`#]+', '', text)
-    emojis = {'✅':'체크','❌':'주의','💡':'팁','📺':'영상','🔥':'중요','⚠️':'경고','📌':'참고'}
+    emojis = {'✅':'체크','❌':'주의','💡':'팁','📺':'영상','🔥':'중요','⚠️':'경고','📌':'참고','📖':'설명','📐':'공식','🎯':'포인트','🔍':'검색'}
     for emoji, word in emojis.items():
         text = text.replace(emoji, word)
     text = re.sub(r'[\U0001F300-\U0001F9FF]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text[:3000] if len(text) > 3000 else text
 
-# ========== 음성 인식 컴포넌트 (질문창 자동 이동) ==========
+# ========== 프리미엄 음성 인식 컴포넌트 ==========
 def create_voice_input():
     return """
-    <div class="voice-container">
+    <div class="voice-premium-container">
+        <div class="voice-header">
+            <div class="voice-icon-wrapper">🎤</div>
+            <div>
+                <p class="voice-title">음성으로 질문하기</p>
+                <p class="voice-subtitle">버튼을 누르고 질문을 말씀하세요</p>
+            </div>
+        </div>
+        
         <button id="voiceBtn">
-            <span id="micIcon">🎤</span>
-            <span id="btnText">음성으로 질문하기</span>
+            <span id="micIcon">🎙️</span>
+            <span id="btnText">음성 인식 시작</span>
         </button>
-        <div id="status">버튼을 누르고 말씀하세요</div>
+        
+        <div id="status">마이크 버튼을 눌러 음성 인식을 시작하세요</div>
     </div>
 
     <div id="result-box">
         <div id="finalResult"></div>
-        <button class="copy-btn" onclick="copyAndPaste()">📋 질문창에 붙여넣기</button>
+        <button class="copy-btn" onclick="copyAndPaste()">✨ 질문창에 자동 입력</button>
     </div>
 
     <script>
@@ -799,9 +925,12 @@ def create_voice_input():
 
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             voiceBtn.disabled = true;
+            voiceBtn.style.background = '#94a3b8';
+            voiceBtn.style.cursor = 'not-allowed';
             btnText.textContent = '음성 인식 미지원';
             micIcon.textContent = '❌';
-            status.innerHTML = '❌ Chrome, Edge, 삼성 인터넷 브라우저를 사용하세요';
+            status.innerHTML = '⚠️ Chrome, Edge, 삼성 인터넷 브라우저를 사용해주세요';
+            status.style.color = '#ef4444';
             return;
         }
 
@@ -817,8 +946,8 @@ def create_voice_input():
                 recognition.stop();
                 isRecording = false;
                 voiceBtn.classList.remove('recording');
-                btnText.textContent = '음성으로 질문하기';
-                micIcon.textContent = '🎤';
+                btnText.textContent = '음성 인식 시작';
+                micIcon.textContent = '🎙️';
             } else {
                 try {
                     recognition.start();
@@ -826,10 +955,12 @@ def create_voice_input():
                     voiceBtn.classList.add('recording');
                     btnText.textContent = '듣는 중... (클릭하면 중지)';
                     micIcon.textContent = '🔴';
-                    status.innerHTML = '🎧 말씀하세요...';
+                    status.innerHTML = '🎧 지금 말씀하세요...';
+                    status.style.color = '#6366f1';
                     resultBox.classList.remove('show');
                 } catch(e) {
-                    status.innerHTML = '❌ 음성 인식 시작 실패. 다시 시도하세요.';
+                    status.innerHTML = '❌ 음성 인식을 시작할 수 없습니다';
+                    status.style.color = '#ef4444';
                 }
             }
         });
@@ -846,38 +977,41 @@ def create_voice_input():
                 }
             }
             if (interimTranscript) {
-                status.innerHTML = '인식 중: "' + interimTranscript + '"';
+                status.innerHTML = '✍️ 인식 중: "' + interimTranscript + '"';
+                status.style.color = '#8b5cf6';
             }
             if (finalTranscript) {
                 recognizedText = finalTranscript.trim();
-                status.innerHTML = '✅ 인식 완료! 질문창으로 이동합니다...';
+                status.innerHTML = '✅ 인식 완료!';
+                status.style.color = '#10b981';
                 finalResult.textContent = '"' + recognizedText + '"';
                 resultBox.classList.add('show');
                 setTimeout(function() {
                     scrollToInputAndFill(recognizedText);
-                }, 300);
+                }, 400);
             }
         };
 
         recognition.onerror = function(event) {
             isRecording = false;
             voiceBtn.classList.remove('recording');
-            btnText.textContent = '음성으로 질문하기';
-            micIcon.textContent = '🎤';
+            btnText.textContent = '음성 인식 시작';
+            micIcon.textContent = '🎙️';
             const errorMessages = {
-                'no-speech': '⚠️ 음성이 감지되지 않았습니다',
-                'not-allowed': '❌ 마이크 권한을 허용해주세요',
-                'network': '❌ 네트워크 오류',
-                'aborted': 'ℹ️ 음성 인식이 중단되었습니다'
+                'no-speech': '⚠️ 음성이 감지되지 않았습니다. 다시 시도해주세요.',
+                'not-allowed': '🔒 마이크 사용 권한이 필요합니다. 브라우저 설정에서 허용해주세요.',
+                'network': '🌐 네트워크 오류가 발생했습니다.',
+                'aborted': 'ℹ️ 음성 인식이 중단되었습니다.'
             };
             status.innerHTML = errorMessages[event.error] || '❌ 오류: ' + event.error;
+            status.style.color = '#ef4444';
         };
 
         recognition.onend = function() {
             isRecording = false;
             voiceBtn.classList.remove('recording');
-            btnText.textContent = '음성으로 질문하기';
-            micIcon.textContent = '🎤';
+            btnText.textContent = '음성 인식 시작';
+            micIcon.textContent = '🎙️';
         };
 
         function scrollToInputAndFill(text) {
@@ -889,10 +1023,8 @@ def create_voice_input():
                 for (let input of inputs) {
                     const placeholder = input.placeholder || '';
                     if (placeholder.includes('질문') || placeholder.includes('예:') || placeholder.includes('입력')) {
-                        // 스크롤 이동
                         input.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                        // React 방식으로 값 설정
                         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
                             window.parent.HTMLInputElement.prototype, 'value'
                         ).set;
@@ -904,35 +1036,36 @@ def create_voice_input():
                         setTimeout(function() {
                             input.focus();
                             input.select();
-                        }, 500);
+                        }, 600);
 
-                        status.innerHTML = '✅ 질문창에 입력 완료! 🔍 질문하기를 눌러주세요';
+                        status.innerHTML = '✅ 질문창에 입력 완료! 아래 "질문하기" 버튼을 눌러주세요';
+                        status.style.color = '#10b981';
                         filled = true;
                         break;
                     }
                 }
 
                 if (!filled) {
-                    // 텍스트 입력창 못 찾은 경우: 클립보드 복사 + 안내
                     if (navigator.clipboard) {
                         navigator.clipboard.writeText(text);
                     }
-                    status.innerHTML = '📋 복사 완료! 아래 질문창에 붙여넣기(Ctrl+V) 하세요';
+                    status.innerHTML = '📋 복사 완료! 질문창에 붙여넣기(Ctrl+V) 해주세요';
+                    status.style.color = '#f59e0b';
 
-                    // 첫번째 인풋으로 스크롤
                     if (inputs.length > 0) {
                         inputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        setTimeout(function() { inputs[0].focus(); }, 500);
+                        setTimeout(function() { inputs[0].focus(); }, 600);
                     }
                 }
             } catch(e) {
-                status.innerHTML = '📋 아래 복사 버튼을 눌러주세요';
+                status.innerHTML = '📋 아래 버튼을 눌러 복사해주세요';
+                status.style.color = '#f59e0b';
             }
         }
 
         window.copyAndPaste = function() {
             if (!recognizedText) {
-                alert('인식된 텍스트가 없습니다.');
+                alert('인식된 텍스트가 없습니다. 먼저 음성 인식을 해주세요.');
                 return;
             }
             if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -943,7 +1076,7 @@ def create_voice_input():
                 const textArea = document.createElement('textarea');
                 textArea.value = recognizedText;
                 textArea.style.position = 'fixed';
-                textArea.style.top = '-1000px';
+                textArea.style.top = '-9999px';
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
@@ -951,7 +1084,7 @@ def create_voice_input():
                     document.execCommand('copy');
                     scrollToInputAndFill(recognizedText);
                 } catch(err) {
-                    alert('복사 실패: ' + recognizedText);
+                    alert('복사할 텍스트: ' + recognizedText);
                 }
                 document.body.removeChild(textArea);
             }
@@ -965,7 +1098,6 @@ def get_gemini_model():
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
 
-        # Gemini 3 Flash 우선 탐색
         priority_list = [
             'gemini-3-flash',
             'gemini-3',
@@ -987,34 +1119,53 @@ def get_gemini_model():
     except:
         return None
 
-# ========== IQ 200 시스템 프롬프트 ==========
-SYSTEM_PROMPT = """당신은 일반기계기사 시험 준비를 돕는 최고 수준의 AI 전문 튜터입니다.
+# ========== IQ 300 박사급 시스템 프롬프트 ==========
+SYSTEM_PROMPT = """당신은 세계 최고 수준의 기계공학 박사(Ph.D.)이자 일반기계기사 시험 전문가입니다.
+MIT, KAIST에서 기계공학을 전공했고, 20년 이상 교육 경력을 보유하고 있습니다.
 
-[핵심 역할]
-- 재료역학, 열역학, 유체역학, 기계요소설계 4과목 전문가
-- 한국산업인력공단 일반기계기사 필기/실기 출제 경향 완벽 숙지
-- 복잡한 개념을 쉽고 직관적으로 설명하는 능력
+[전문 분야]
+• 재료역학 (Strength of Materials): 응력-변형률 해석, 보의 휨/처짐, 모어원, 주응력, 좌굴, 비틀림, 조합응력
+• 열역학 (Thermodynamics): 열역학 법칙, 카르노/랭킨/오토/디젤 사이클, 엔트로피, 엔탈피, 냉동사이클
+• 유체역학 (Fluid Mechanics): 연속방정식, 베르누이, 운동량방정식, 관마찰, 점성유동, 레이놀즈수
+• 기계요소설계 (Machine Element Design): 나사, 기어, 베어링, 축, 키, 스프링, 용접, 파손이론
 
-[답변 원칙]
-1. 정확성: 공식, 단위, 계산 과정을 절대 틀리지 않는다
-2. 체계성: 핵심 → 원리 → 공식 → 예제 → 시험 팁 순서로 설명
-3. 실전성: 실제 시험에 어떻게 출제되는지 반드시 언급
-4. 친절함: 초보자도 이해할 수 있게 비유와 예시를 활용
-5. 완전성: 질문에 대해 빠짐없이 완벽하게 답변
+[답변 철학]
+1. 완벽한 정확성 - 공식, 단위, 수치를 절대 틀리지 않는다
+2. 깊이 있는 설명 - 표면적 설명이 아닌 근본 원리를 파악시킨다
+3. 체계적 구조 - 논리적 순서로 이해를 돕는다
+4. 실전 적용 - 실제 시험 문제에 어떻게 적용하는지 보여준다
+5. 기억 최적화 - 암기가 쉽도록 연상법, 핵심 포인트를 제공한다
 
 [답변 형식]
-📌 **핵심 요약** — 한 줄로 핵심 정리
-📖 **상세 설명** — 원리와 개념을 단계별 설명
-📐 **공식/계산** — 관련 공식 (단위 포함)과 풀이 예시
-🎯 **시험 출제 포인트** — 자주 출제되는 유형과 함정
-💡 **합격 꿀팁** — 암기법, 실수 방지 노하우
-📺 **추천 영상** — YouTube URL 포함 (https://www.youtube.com/watch?v=VIDEO_ID)
-🔍 **검색 키워드** — 추가 학습을 위한 키워드 3개
+📌 **핵심 한줄 요약**
+→ 질문의 핵심을 한 문장으로 정리
 
-[금지 사항]
-- 틀린 정보 절대 불가
-- 모호한 답변 불가 — 확실하지 않으면 명시
-- 답변 생략 불가 — 항상 완전한 답변 제공
+📖 **원리 설명**
+→ 왜 그런지, 어떤 배경에서 나온 개념인지 상세 설명
+→ 필요시 물리적 의미, 유도 과정 포함
+
+📐 **공식 및 계산**
+→ 관련 공식 (SI 단위 명시)
+→ 대표적인 계산 예시 1개 이상
+→ 단위 환산 주의사항
+
+🎯 **시험 출제 포인트**
+→ 자주 출제되는 유형
+→ 함정 문제 유형
+→ 계산 실수 방지 팁
+
+💡 **암기 꿀팁**
+→ 외우기 쉬운 방법 (두문자어, 연상법 등)
+→ 비슷한 개념과의 구분법
+→ 시험 직전 체크리스트
+
+[중요 규칙]
+• 절대로 틀린 정보를 제공하지 않는다
+• 확실하지 않은 내용은 "확인 필요"라고 명시한다
+• 공식에는 반드시 SI 단위를 포함한다
+• 모호하게 답하지 않고 명확하게 답한다
+• YouTube 영상 추천은 하지 않는다
+• 검색 키워드 추천도 하지 않는다
 """
 
 # ========== 세션 초기화 ==========
@@ -1035,9 +1186,9 @@ st.markdown("""
     <div class="hero-title">⚙️ 일반기계기사 AI 학습 가이드</div>
     <div class="hero-subtitle">
         영욱이와 설매의 합격을 응원합니다 🔥<br>
-        Gemini 3 Flash AI 튜터 · 광고 없는 YouTube 강의 · 음성 질문
+        Gemini 3 Flash 박사급 AI 튜터 · 광고 없는 YouTube · 음성 질문
     </div>
-    <div class="hero-badge">POWERED BY GEMINI 3 FLASH</div>
+    <div class="hero-badge">🎓 IQ 300 · PH.D LEVEL AI TUTOR</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1050,9 +1201,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 음성 입력
-st.markdown("##### 🎤 음성으로 질문")
-st.caption("Chrome, Edge, 삼성 인터넷 브라우저 권장 · 마이크 권한 필요")
-components.html(create_voice_input(), height=280, scrolling=False)
+components.html(create_voice_input(), height=320, scrolling=False)
 
 st.markdown("---")
 
@@ -1074,7 +1223,7 @@ with tab1:
             try:
                 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-                with st.spinner("🤖 Gemini 3 Flash가 최고의 답변을 생성 중..."):
+                with st.spinner("🎓 박사급 AI가 최고의 답변을 준비 중..."):
                     model_name = get_gemini_model()
 
                     if model_name:
@@ -1086,9 +1235,9 @@ with tab1:
                         user_prompt = f"""[학생 질문]
 {query}
 
-위 질문에 대해 일반기계기사 시험 준비생에게 완벽한 답변을 작성하세요.
-반드시 정해진 형식(📌📖📐🎯💡📺🔍)을 따르세요.
-YouTube 영상 추천 시 실제 존재하는 URL을 포함하세요."""
+위 질문에 대해 일반기계기사 시험을 준비하는 학생에게 완벽한 답변을 작성하세요.
+정해진 형식(📌📖📐🎯💡)을 정확히 따르세요.
+YouTube 영상 추천이나 검색 키워드는 포함하지 마세요."""
 
                         response = model.generate_content(user_prompt)
                         st.session_state.ai_response = response.text
@@ -1129,7 +1278,7 @@ with tab2:
             try:
                 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-                with st.spinner("🖼️ Gemini 3 Flash가 이미지를 정밀 분석 중..."):
+                with st.spinner("🎓 박사급 AI가 이미지를 정밀 분석 중..."):
                     model_name = get_gemini_model()
 
                     if model_name:
@@ -1140,15 +1289,16 @@ with tab2:
                         image = Image.open(uploaded_file)
 
                         img_prompt = f"""[이미지 분석 요청]
-{f'학생 질문: {image_query}' if image_query else '이미지를 분석하고 상세히 설명하세요'}
+{f'학생 질문: {image_query}' if image_query else '이 이미지를 분석하고 상세히 설명해주세요'}
 
-이미지를 분석한 후 다음을 포함하여 답변하세요:
-1. 📌 이미지 내용 파악
-2. 📖 관련 개념/이론 설명
-3. 📐 문제라면 완전한 단계별 풀이 (공식, 단위, 계산 포함)
-4. 🎯 시험 출제 포인트
-5. 💡 유사 문제 대비 팁
-6. 📺 추천 YouTube 영상 (URL 포함)"""
+이미지를 분석한 후 다음 형식으로 답변하세요:
+📌 이미지 내용 한줄 요약
+📖 관련 개념/이론 상세 설명
+📐 문제라면 완전한 단계별 풀이 (공식, 단위, 계산 포함)
+🎯 시험 출제 포인트 및 주의사항
+💡 유사 문제 대비 암기 팁
+
+YouTube 영상 추천이나 검색 키워드는 포함하지 마세요."""
 
                         response = model.generate_content([img_prompt, image])
                         st.session_state.ai_response = response.text
@@ -1165,7 +1315,6 @@ with tab2:
 if st.session_state.ai_response:
     st.markdown("---")
 
-    # 상단 컨트롤
     col1, col2, col3 = st.columns([1, 2, 2])
 
     with col1:
@@ -1196,11 +1345,9 @@ if st.session_state.ai_response:
                 else:
                     st.error("❌ 음성 생성 실패")
 
-    # 모델 정보 표시
     if st.session_state.model_name:
         st.caption(f"🤖 사용 모델: `{st.session_state.model_name}`")
 
-    # 음성 재생
     if st.session_state.audio_playing:
         st.markdown("##### 🎧 음성 재생")
         clean = clean_text_for_tts(st.session_state.ai_response)
@@ -1208,7 +1355,7 @@ if st.session_state.ai_response:
         if audio:
             audio_b64 = base64.b64encode(audio).decode()
             st.markdown(f"""
-            <audio controls autoplay style="width: 100%; border-radius: 12px;">
+            <audio controls autoplay style="width: 100%; border-radius: 14px;">
                 <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
             </audio>
             """, unsafe_allow_html=True)
@@ -1217,16 +1364,14 @@ if st.session_state.ai_response:
                 st.rerun()
         st.markdown("---")
 
-    # 분석 이미지
     if st.session_state.uploaded_image:
         st.image(st.session_state.uploaded_image, caption="분석한 이미지", use_container_width=True)
 
-    # 답변 렌더링
     response_text = st.session_state.ai_response
     response_text = format_youtube_links(response_text)
     response_text = add_search_links(response_text)
 
-    st.markdown("##### 💡 AI 답변")
+    st.markdown("##### 🎓 박사급 AI 답변")
     st.markdown(f'<div class="ai-response">{response_text}</div>', unsafe_allow_html=True)
 
 st.markdown("---")
@@ -1339,18 +1484,16 @@ with col2:
 # ========== 푸터 ==========
 st.markdown("""
 <div class="footer-section">
-    <h2 style="color: #a5b4fc; margin: 0 0 15px 0; font-size: 1.8rem; font-weight: 700;">
-        🔥 일반기계기사 합격을 응원합니다! 🔥
-    </h2>
-    <p style="color: rgba(255,255,255,0.75); font-size: 1.05rem; margin: 12px 0; line-height: 1.8;">
+    <h2>🔥 일반기계기사 합격을 응원합니다! 🔥</h2>
+    <p style="color: #4a6d8c; font-size: 1.08rem; margin: 15px 0; line-height: 1.9;">
         🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!<br>
         ✅ 모든 YouTube 영상 광고 100% 차단 (Invidious 제공)
     </p>
-    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <p style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin: 0;">
+    <div style="margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(0,0,0,0.08);">
+        <p style="color: #7a9bb8; font-size: 0.88rem; margin: 0;">
             Made with ❤️ by AI &nbsp;·&nbsp; Powered by Gemini 3 Flash + Edge TTS + Invidious + Web Speech API
         </p>
-        <p style="color: rgba(255,255,255,0.3); font-size: 0.78rem; margin: 8px 0 0 0;">
+        <p style="color: #94a3b8; font-size: 0.8rem; margin: 10px 0 0 0;">
             💬 음성 인식은 Chrome, Edge, 삼성 인터넷 브라우저에서 작동합니다
         </p>
     </div>
