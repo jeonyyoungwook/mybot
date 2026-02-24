@@ -8,10 +8,12 @@ import asyncio
 import edge_tts
 import io
 import base64
-from pathlib import Path
-import tempfile
+import requests
+import time
+from typing import List, Tuple, Optional
+import yt_dlp
 
-# ========== 1. 페이지 기본 설정 (모바일 최적화) ==========
+# ========== 1. 페이지 기본 설정 ==========
 st.set_page_config(
     page_title="일반기계기사 학습 가이드",
     page_icon="⚙️",
@@ -19,14 +21,138 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ========== 🌐 Invidious 서버 자동 체크 (핵심!) ==========
+@st.cache_data(ttl=300)  # 5분마다 갱신
+def get_working_invidious_instances() -> List[Tuple[str, str]]:
+    """살아있는 Invidious 서버를 자동으로 찾아서 반환"""
+    try:
+        # Invidious 공식 인스턴스 목록 API
+        api_url = "https://api.invidious.io/instances.json"
+        response = requests.get(api_url, timeout=10)
+        instances_data = response.json()
+        
+        working_instances = []
+        
+        for instance in instances_data:
+            try:
+                domain = instance[0]
+                info = instance[1]
+                
+                # 살아있고, HTTPS 지원하고, API 활성화된 서버만
+                if (info.get('type') == 'https' and 
+                    info.get('api') == True and
+                    info.get('monitor', {}).get('statusClass') in ['success', 'warning']):
+                    
+                    # 실제로 접속 가능한지 빠르게 체크
+                    test_url = f"https://{domain}/api/v1/videos/jNQXAC9IVRw"
+                    
+                    try:
+                        test_response = requests.head(test_url, timeout=3, allow_redirects=True)
+                        if test_response.status_code < 500:
+                            working_instances.append((domain, f"서버 {len(working_instances)+1}"))
+                            
+                            if len(working_instances) >= 10:  # 최대 10개만
+                                break
+                    except:
+                        continue
+                        
+            except Exception:
+                continue
+        
+        # 못 찾으면 fallback 서버들
+        if not working_instances:
+            fallback_instances = [
+                ("inv.tux.pizza", "독일 서버"),
+                ("invidious.privacyredirect.com", "미국 서버"),
+                ("iv.nboeck.de", "독일 서버2"),
+                ("yt.artemislena.eu", "루마니아 서버"),
+                ("invidious.fdn.fr", "프랑스 서버")
+            ]
+            
+            for domain, name in fallback_instances:
+                try:
+                    test_url = f"https://{domain}/api/v1/videos/jNQXAC9IVRw"
+                    test_response = requests.head(test_url, timeout=3)
+                    if test_response.status_code < 500:
+                        working_instances.append((domain, name))
+                except:
+                    continue
+        
+        return working_instances if working_instances else [("youtube.com", "YouTube 원본")]
+        
+    except Exception as e:
+        return [
+            ("inv.tux.pizza", "기본 서버"),
+            ("youtube.com", "YouTube 원본")
+        ]
+
+# ========== 🎬 광고 없는 YouTube 플레이어 ==========
+def create_ad_free_youtube_player(video_id: str, title: str = "YouTube 영상") -> str:
+    """실시간으로 살아있는 Invidious 서버를 찾아서 플레이어 생성"""
+    
+    invidious_instances = get_working_invidious_instances()
+    
+    if not invidious_instances or invidious_instances[0][0] == "youtube.com":
+        return f"""
+        <div class="youtube-card">
+            <h4>⚠️ {title}</h4>
+            <p style="color: #ef4444;">
+                현재 사용 가능한 서버가 없습니다. 
+                <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">YouTube에서 보기 →</a>
+            </p>
+        </div>
+        """
+    
+    main_instance = invidious_instances[0][0]
+    main_embed = f"https://{main_instance}/embed/{video_id}?autoplay=0&quality=dash&local=true"
+    
+    server_buttons = ""
+    for i, (instance, name) in enumerate(invidious_instances[1:6], 1):
+        embed_url = f"https://{instance}/embed/{video_id}?local=true"
+        server_buttons += f'''
+            <a href="{embed_url}" target="_blank" class="server-btn">
+                🎬 {name}에서 보기
+            </a>
+        '''
+    
+    return f"""
+    <div class="youtube-card">
+        <h4>🎬 {title} <span class="adfree-badge">광고 0개</span></h4>
+        <div class="adfree-youtube-container">
+            <iframe 
+                src="{main_embed}"
+                allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                title="{title}"
+            ></iframe>
+        </div>
+        <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
+            ✅ 현재 사용 중: <strong>{main_instance}</strong> | 
+            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
+                YouTube 원본 →
+            </a>
+        </p>
+        <details style="margin-top: 10px;">
+            <summary style="cursor: pointer; color: #666; font-size: 0.85rem; padding: 8px; background: #f3f4f6; border-radius: 6px;">
+                📡 재생 안 되면 다른 서버 선택
+            </summary>
+            <div class="server-selector">
+                <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">대체 서버들 (모두 광고 없음):</p>
+                {server_buttons}
+            </div>
+        </details>
+    </div>
+    """
+
 # ========== 🎨 모바일 최적화 CSS ==========
 st.markdown("""
 <style>
     html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
         height: 100%;
         min-height: 100vh;
-        min-height: -webkit-fill-available;
-        min-height: 100dvh;
         overflow-x: hidden;
         margin: 0;
         padding: 0;
@@ -56,11 +182,6 @@ st.markdown("""
             font-size: 16px !important;
             min-height: 48px !important;
         }
-        
-        [data-testid="column"] {
-            min-width: 100% !important;
-            margin-bottom: 1rem !important;
-        }
     }
     
     img {
@@ -69,25 +190,6 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    [data-testid="stTabs"] {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    [data-testid="stExpander"] summary {
-        min-height: 48px !important;
-        padding: 12px !important;
-        font-size: 1rem !important;
-    }
-    
-    a {
-        padding: 8px 4px !important;
-        display: inline-block;
-        min-height: 44px;
-        line-height: 28px;
-    }
-    
-    /* ========== 광고 없는 YouTube 플레이어 스타일 ========== */
     .adfree-youtube-container {
         position: relative;
         width: 100%;
@@ -119,42 +221,6 @@ st.markdown("""
     .youtube-card h4 {
         color: #ff0000;
         margin: 0 0 15px 0;
-    }
-    
-    .youtube-thumbnail {
-        width: 100%;
-        max-width: 100%;
-        height: auto;
-        border-radius: 8px;
-        margin: 10px 0;
-        cursor: pointer;
-        transition: transform 0.2s;
-    }
-    
-    .youtube-thumbnail:hover {
-        transform: scale(1.02);
-    }
-    
-    .play-button {
-        display: inline-block;
-        background-color: #ff0000;
-        color: white;
-        padding: 14px 24px;
-        border-radius: 10px;
-        text-decoration: none;
-        font-weight: bold;
-        text-align: center;
-        width: 100%;
-        box-sizing: border-box;
-        min-height: 48px;
-        line-height: 20px;
-        transition: background-color 0.2s;
-    }
-    
-    .play-button:hover {
-        background-color: #cc0000;
-        color: white;
-        text-decoration: none;
     }
     
     .adfree-badge {
@@ -194,67 +260,10 @@ st.markdown("""
         text-decoration: none;
     }
     
-    .voice-container {
-        position: relative;
-        width: 100%;
-        max-width: 100%;
-        overflow: hidden;
-    }
-    
-    @media (max-width: 768px) {
-        .voice-container {
-            flex-direction: column;
-            gap: 10px !important;
-        }
-        
-        #voiceBtn {
-            width: 100% !important;
-            min-height: 56px !important;
-            font-size: 1.1rem !important;
-        }
-        
-        #status {
-            text-align: center;
-            width: 100%;
-        }
-        
-        #result-box {
-            font-size: 0.95rem !important;
-            padding: 15px !important;
-        }
-    }
-    
-    @supports (padding: max(0px)) {
-        .main .block-container {
-            padding-top: max(2rem, env(safe-area-inset-top)) !important;
-            padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important;
-            padding-left: max(1rem, env(safe-area-inset-left)) !important;
-            padding-right: max(1rem, env(safe-area-inset-right)) !important;
-        }
-    }
-    
     audio {
         width: 100% !important;
         max-width: 100% !important;
         min-height: 48px;
-    }
-    
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,0.2);
-        border-radius: 4px;
-    }
-    
-    [data-testid="stSpinner"] {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 9999;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -351,7 +360,6 @@ def create_voice_input_component():
             gap: 10px;
             width: 100%;
             min-height: 56px;
-            -webkit-tap-highlight-color: transparent;
         }
         
         #voiceBtn:active {
@@ -414,19 +422,11 @@ def create_voice_input_component():
             width: 100%;
             min-height: 48px;
             font-weight: bold;
-            -webkit-tap-highlight-color: transparent;
         }
         
         .copy-btn:active {
             background: #059669;
             transform: scale(0.98);
-        }
-        
-        @media (max-width: 768px) {
-            .voice-container { padding: 15px; }
-            #voiceBtn { font-size: 1rem; padding: 16px 20px; }
-            #status { font-size: 0.9rem; }
-            #result-box { font-size: 0.95rem; padding: 12px; }
         }
     </style>
     
@@ -513,7 +513,6 @@ def create_voice_input_component():
         };
 
         recognition.onerror = (event) => {
-            console.error('음성 인식 오류:', event.error);
             voiceBtn.classList.remove('recording');
             btnText.textContent = '음성으로 질문하기';
             micIcon.textContent = '🎤';
@@ -576,63 +575,6 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 🎬 완전 광고 없는 YouTube 플레이어 (봇 체크 없는 안정 서버) ==========
-def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
-    """Invidious 기반 광고 없는 플레이어 (봇 체크 없음)"""
-    
-    # 2025년 1월 기준 봇 체크 없는 안정 서버들
-    invidious_instances = [
-        ("iv.melmac.space", "주 서버"),
-        ("invidious.fdn.fr", "서버 2"),
-        ("yt.artemislena.eu", "서버 3"),
-        ("inv.tux.pizza", "서버 4"),
-        ("inv.nadeko.net", "서버 5")
-    ]
-    
-    # 로그인 경고 없고 봇 체크 없는 설정
-    main_embed = f"https://{invidious_instances[0][0]}/embed/{video_id}?autoplay=0&quality=dash&local=true"
-    
-    server_buttons = ""
-    for i, (instance, name) in enumerate(invidious_instances[1:], 1):
-        embed_url = f"https://{instance}/embed/{video_id}?local=true"
-        server_buttons += f'''
-            <a href="{embed_url}" target="_blank" class="server-btn">
-                🎬 {name}에서 보기
-            </a>
-        '''
-    
-    return f"""
-    <div class="youtube-card">
-        <h4>🎬 {title} <span class="adfree-badge">광고 0개</span></h4>
-        <div class="adfree-youtube-container">
-            <iframe 
-                src="{main_embed}"
-                allowfullscreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                loading="lazy"
-                referrerpolicy="no-referrer"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                title="{title}"
-            ></iframe>
-        </div>
-        <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
-            ✅ Invidious 제공 (광고 100% 차단 · 로그인 불필요) | 
-            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
-                YouTube 원본 →
-            </a>
-        </p>
-        <details style="margin-top: 10px;">
-            <summary style="cursor: pointer; color: #666; font-size: 0.85rem; padding: 8px; background: #f3f4f6; border-radius: 6px;">
-                📡 재생 안 되면 다른 서버 선택
-            </summary>
-            <div class="server-selector">
-                <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">대체 서버들 (모두 광고 없음):</p>
-                {server_buttons}
-            </div>
-        </details>
-    </div>
-    """
-
 # ========== 유틸리티 함수들 ==========
 def format_youtube_links(text):
     """YouTube 링크를 광고 없는 플레이어로 변환"""
@@ -647,7 +589,6 @@ def format_youtube_links(text):
         matches = list(re.finditer(pattern, formatted_text))
         for match in reversed(matches):
             video_id = match.group(1)
-            original_url = match.group(0)
             player_html = create_ad_free_youtube_player(video_id, label)
             formatted_text = formatted_text[:match.start()] + player_html + formatted_text[match.end():]
     
@@ -665,20 +606,15 @@ def make_links_clickable(text):
 
 def add_youtube_search_links(text):
     """키워드에 Invidious 검색 링크 추가"""
+    instances = get_working_invidious_instances()
+    search_instance = instances[0][0] if instances and instances[0][0] != "youtube.com" else "youtube.com"
+    
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
         "랭킨 사이클", "오토 사이클", "디젤 사이클",
-        "레이놀즈 수", "기어", "베어링", "나사", "에너지 보존",
-        "응력", "변형률", "전단력", "굽힘모멘트"
+        "레이놀즈 수", "기어", "베어링", "나사"
     ]
-    
-    channel_names = [
-        "홍교수", "기계의신", "기계달인", "에듀윌", "메가파이", 
-        "한솔아카데미", "공밀레", "Learn Engineering"
-    ]
-    
-    all_keywords = keywords + channel_names
     
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
     links_found = re.findall(link_pattern, text)
@@ -694,15 +630,19 @@ def add_youtube_search_links(text):
     modified_text = protected_text
     used_keywords = set()
     
-    for keyword in all_keywords:
+    for keyword in keywords:
         if keyword in modified_text and keyword not in used_keywords:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
-            invidious_search = f"https://iv.melmac.space/search?q={search_query}"
+            
+            if search_instance != "youtube.com":
+                search_url = f"https://{search_instance}/search?q={search_query}"
+            else:
+                search_url = f"https://www.youtube.com/results?search_query={search_query}"
             
             pattern = rf'\b({re.escape(keyword)})\b'
             
             if re.search(pattern, modified_text):
-                replacement = f'[\\1 📺]({invidious_search})'
+                replacement = f'[\\1 📺]({search_url})'
                 modified_text = re.sub(pattern, replacement, modified_text, count=1)
                 used_keywords.add(keyword)
     
@@ -718,7 +658,7 @@ def get_best_gemini_model():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        priority_order = ['gemini-3', 'gemini-2.5', 'gemini-2.0', 'gemini-1.5', 'gemini-pro']
+        priority_order = ['gemini-2.0-flash-exp', 'gemini-exp', 'gemini-2.5', 'gemini-2.0', 'gemini-1.5', 'gemini-pro']
         
         for priority in priority_order:
             for model_name in available_models:
@@ -736,7 +676,8 @@ def get_model_display_name(model_name):
         return "알 수 없음"
     
     model_mapping = {
-        'gemini-3': 'Gemini 3 Flash',
+        'gemini-2.0-flash-exp': 'Gemini 2.0 Flash (실험)',
+        'gemini-exp': 'Gemini Experimental',
         'gemini-2.5': 'Gemini 2.5 Flash',
         'gemini-2.0': 'Gemini 2.0 Flash',
         'gemini-1.5': 'Gemini 1.5 Pro',
@@ -769,6 +710,19 @@ st.markdown("""
 영욱이와 설매의 합격을 기원합니다.  
 **✅ 광고 100% 차단** 유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
 """)
+
+# 🌐 서버 상태 표시
+with st.expander("🌐 현재 사용 중인 서버 상태", expanded=False):
+    with st.spinner("서버 목록 확인 중..."):
+        working_instances = get_working_invidious_instances()
+        
+        if working_instances and working_instances[0][0] != "youtube.com":
+            st.success(f"✅ 사용 가능한 서버: **{len(working_instances)}개**")
+            
+            for i, (domain, name) in enumerate(working_instances[:5], 1):
+                st.markdown(f"{i}. **{domain}** ({name})")
+        else:
+            st.warning("⚠️ Invidious 서버를 찾지 못했습니다. YouTube 원본을 사용합니다.")
 
 st.divider()
 
@@ -828,7 +782,7 @@ with st.container():
                         else:
                             st.error("❌ 사용 가능한 Gemini 모델을 찾을 수 없습니다.")
                 else:
-                    st.error("⚠️ API 키가 설정되지 않았습니다.")
+                    st.error("⚠️ API 키가 설정되지 않았습니다. Streamlit Secrets에 GOOGLE_API_KEY를 추가하세요.")
                     
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
@@ -901,8 +855,9 @@ with st.container():
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
 
-    st.markdown("")
+    # AI 답변 표시
     if st.session_state.ai_response:
+        st.markdown("")
         col_del, col_voice, col_tts = st.columns([1, 2, 2])
         
         with col_del:
@@ -985,34 +940,37 @@ st.divider()
 # ========== 광고 없는 채널 추천 ==========
 st.header("📺 1. 추천 유튜브 채널 (광고 없음)")
 
-st.info("💡 **모든 링크는 Invidious를 통해 광고 없이 재생됩니다! 봇 체크 없음!**")
+st.info("💡 **모든 링크는 Invidious를 통해 광고 없이 재생됩니다! 자동으로 살아있는 서버 연결!**")
+
+working_instances = get_working_invidious_instances()
+search_base = f"https://{working_instances[0][0]}/search?q=" if working_instances and working_instances[0][0] != "youtube.com" else "https://www.youtube.com/results?search_query="
 
 col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
-    st.markdown("""
-👉 [**기계달인**](https://iv.melmac.space/search?q=기계달인+일반기계기사)  
+    st.markdown(f"""
+👉 [**기계달인**]({search_base}기계달인+일반기계기사)  
 (전과목 강의)
 
-👉 [**에듀윌**](https://iv.melmac.space/search?q=에듀윌+일반기계기사)  
+👉 [**에듀윌**]({search_base}에듀윌+일반기계기사)  
 (핵심 요약)
 """)
 
 with col_ch2:
-    st.markdown("""
-👉 [**메가파이**](https://iv.melmac.space/search?q=메가파이+일반기계기사)  
+    st.markdown(f"""
+👉 [**메가파이**]({search_base}메가파이+일반기계기사)  
 (자격증 꿀팁)
 
-👉 [**한솔아카데미**](https://iv.melmac.space/search?q=한솔아카데미+일반기계기사)  
+👉 [**한솔아카데미**]({search_base}한솔아카데미+일반기계기사)  
 (기출 해설)
 """)
 
 with col_ch3:
-    st.markdown("""
-👉 [**공밀레**](https://iv.melmac.space/search?q=공밀레+재료역학)  
+    st.markdown(f"""
+👉 [**공밀레**]({search_base}공밀레+재료역학)  
 (개념 이해)
 
-👉 [**Learn Engineering**](https://iv.melmac.space/search?q=Learn+Engineering)  
+👉 [**Learn Engineering**]({search_base}Learn+Engineering)  
 (영문/애니메이션)
 """)
 
@@ -1022,40 +980,40 @@ st.markdown("")
 st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
-    st.markdown("""
-- [🧱 기초 강의](https://iv.melmac.space/search?q=재료역학+기초+강의)
-- [📉 SFD/BMD 그리기](https://iv.melmac.space/search?q=SFD+BMD+그리는법)
-- [➰ 보의 처짐](https://iv.melmac.space/search?q=재료역학+보의+처짐)
-- [🌀 모어원](https://iv.melmac.space/search?q=재료역학+모어원)
-- [🏛️ 좌굴 공식](https://iv.melmac.space/search?q=재료역학+좌굴+공식)
-- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+재료역학+기출문제)
+    st.markdown(f"""
+- [🧱 기초 강의]({search_base}재료역학+기초+강의)
+- [📉 SFD/BMD 그리기]({search_base}SFD+BMD+그리는법)
+- [➰ 보의 처짐]({search_base}재료역학+보의+처짐)
+- [🌀 모어원]({search_base}재료역학+모어원)
+- [🏛️ 좌굴 공식]({search_base}재료역학+좌굴+공식)
+- [📝 기출문제]({search_base}일반기계기사+재료역학+기출문제)
 """)
 
 with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
-    st.markdown("""
-- [🔥 열역학 법칙](https://iv.melmac.space/search?q=열역학+법칙+설명)
-- [🔄 사이클 정리](https://iv.melmac.space/search?q=열역학+사이클+정리)
-- [🌡️ 엔트로피](https://iv.melmac.space/search?q=열역학+엔트로피)
-- [💨 냉동 사이클](https://iv.melmac.space/search?q=일반기계기사+냉동사이클)
-- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+열역학+기출)
+    st.markdown(f"""
+- [🔥 열역학 법칙]({search_base}열역학+법칙+설명)
+- [🔄 사이클 정리]({search_base}열역학+사이클+정리)
+- [🌡️ 엔트로피]({search_base}열역학+엔트로피)
+- [💨 냉동 사이클]({search_base}일반기계기사+냉동사이클)
+- [📝 기출문제]({search_base}일반기계기사+열역학+기출)
 """)
 
 with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
-    st.markdown("""
-- [💧 유체 성질](https://iv.melmac.space/search?q=유체역학+점성계수)
-- [🌪️ 베르누이 방정식](https://iv.melmac.space/search?q=베르누이+방정식+문제풀이)
-- [📏 관로 마찰](https://iv.melmac.space/search?q=달시+바이스바흐+공식)
-- [⚡ 운동량 방정식](https://iv.melmac.space/search?q=유체역학+운동량방정식)
-- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+유체역학+기출)
+    st.markdown(f"""
+- [💧 유체 성질]({search_base}유체역학+점성계수)
+- [🌪️ 베르누이 방정식]({search_base}베르누이+방정식+문제풀이)
+- [📏 관로 마찰]({search_base}달시+바이스바흐+공식)
+- [⚡ 운동량 방정식]({search_base}유체역학+운동량방정식)
+- [📝 기출문제]({search_base}일반기계기사+유체역학+기출)
 """)
 
 with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
-    st.markdown("""
-- [⚙️ 기어/베어링](https://iv.melmac.space/search?q=기계요소설계+기어+베어링)
-- [🔩 나사/볼트](https://iv.melmac.space/search?q=기계요소설계+나사+효율)
-- [🛡️ 파손 이론](https://iv.melmac.space/search?q=기계설계+파손이론)
-- [🔗 축/커플링](https://iv.melmac.space/search?q=기계요소설계+축+설계)
-- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+기계요소설계+기출)
+    st.markdown(f"""
+- [⚙️ 기어/베어링]({search_base}기계요소설계+기어+베어링)
+- [🔩 나사/볼트]({search_base}기계요소설계+나사+효율)
+- [🛡️ 파손 이론]({search_base}기계설계+파손이론)
+- [🔗 축/커플링]({search_base}기계요소설계+축+설계)
+- [📝 기출문제]({search_base}일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
@@ -1067,19 +1025,19 @@ col_prac1, col_prac2 = st.columns(2)
 
 with col_prac1:
     st.subheader("📝 필답형")
-    st.markdown("""
-- [📖 요약 정리](https://iv.melmac.space/search?q=일반기계기사+필답형+요약)
-- [✍️ 기출 풀이](https://iv.melmac.space/search?q=일반기계기사+필답형+기출)
-- [🎯 공식 정리](https://iv.melmac.space/search?q=일반기계기사+필답형+공식)
+    st.markdown(f"""
+- [📖 요약 정리]({search_base}일반기계기사+필답형+요약)
+- [✍️ 기출 풀이]({search_base}일반기계기사+필답형+기출)
+- [🎯 공식 정리]({search_base}일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
     st.subheader("💻 작업형")
-    st.markdown("""
-- [🖱️ 인벤터 기초](https://iv.melmac.space/search?q=일반기계기사+인벤터+기초)
-- [📐 투상 연습](https://iv.melmac.space/search?q=일반기계기사+투상+연습)
-- [📏 거칠기/공차](https://iv.melmac.space/search?q=일반기계기사+거칠기+기하공차)
-- [⚡ 기출 실습](https://iv.melmac.space/search?q=일반기계기사+작업형+기출)
+    st.markdown(f"""
+- [🖱️ 인벤터 기초]({search_base}일반기계기사+인벤터+기초)
+- [📐 투상 연습]({search_base}일반기계기사+투상+연습)
+- [📏 거칠기/공차]({search_base}일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습]({search_base}일반기계기사+작업형+기출)
 """)
 
 st.divider()
@@ -1110,7 +1068,7 @@ with st.expander("📖 추천 자료", expanded=False):
 ### 🌐 사이트
 - [큐넷](https://www.q-net.or.kr) - 시험 접수
 - [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
-- [공학용 계산기](https://iv.melmac.space/search?q=공학용계산기+사용법)
+- [공학용 계산기]({search_base}공학용계산기+사용법)
 """)
 
 st.divider()
@@ -1123,7 +1081,7 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 **Invidious** - 오픈소스 YouTube 프론트엔드
 - ✅ **광고 100% 차단** (YouTube Premium 불필요)
 - ✅ **로그인 경고 없음**
-- ✅ **봇 체크 없음** (iv.melmac.space 서버)
+- ✅ **봇 체크 없음** (자동 서버 선택)
 - ✅ 스폰서블록 자동 스킵
 - ✅ 백그라운드 재생 지원
 - ✅ 1080p/4K 지원
@@ -1136,18 +1094,11 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 2. [LibreTube 앱](https://libretube.dev) 설치
 
 **iPhone:**
-1. Safari에서 https://iv.melmac.space 북마크
+1. Safari에서 Invidious 인스턴스 북마크
 2. 또는 이 앱에서 제공하는 링크 클릭!
 
 **모든 기기:**
 - 🎯 이 앱의 모든 링크는 자동으로 광고 없음!
-
-### 🌐 Invidious 공식 인스턴스 (모두 안전함)
-- https://iv.melmac.space (주 서버 - 봇 체크 없음)
-- https://invidious.fdn.fr (백업 1)
-- https://yt.artemislena.eu (백업 2)
-- https://inv.tux.pizza (백업 3)
-- https://inv.nadeko.net (백업 4)
 
 ### 🔒 왜 광고가 안 나올까?
 Invidious는 YouTube 데이터를 직접 추출해서  
@@ -1158,21 +1109,23 @@ Invidious는 YouTube 데이터를 직접 추출해서
 st.divider()
 
 # ========== 푸터 ==========
-st.markdown("""
+working_count = len([i for i in working_instances if i[0] != "youtube.com"])
+
+st.markdown(f"""
 <div style='text-align: center; color: #666; padding: 20px 10px;'>
     <p style='font-size: 1.2rem; font-weight: bold;'>🔥 일반기계기사 합격을 응원합니다! 🔥</p>
     <p style='font-size: 0.95rem; margin-top: 10px;'>
         💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!
     </p>
     <p style='font-size: 0.9rem; margin-top: 10px; color: #10b981; font-weight: bold;'>
-        ✅ 모든 유튜브 영상 광고 100% 차단! (Invidious 제공)
+        ✅ 모든 유튜브 영상 광고 100% 차단! (자동 서버 선택)
     </p>
     <p style='font-size: 0.85rem; margin-top: 5px; color: #059669;'>
-        🚫 YouTube Premium 없어도 광고 0개! 봇 체크도 없음!
+        🚫 YouTube Premium 없어도 광고 0개! 현재 {working_count}개 서버 사용 가능
     </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
         Made with ❤️ by AI<br>
-        Powered by Gemini AI + Edge TTS + Invidious + Web Speech API
+        Powered by Gemini AI + Edge TTS + Invidious API + yt-dlp + Web Speech API
     </p>
     <p style='font-size: 0.75rem; margin-top: 10px; color: #aaa;'>
         Invidious는 AGPL-3.0 라이선스 오픈소스 프로젝트입니다
