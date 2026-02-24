@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ========== 프리미엄 CSS 스타일 (부드러운 배경) ==========
+# ========== 프리미엄 CSS 스타일 ==========
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap');
@@ -35,7 +35,7 @@ st.markdown("""
         max-width: 1200px;
     }
 
-    /* ===== 히어로 섹션 (부드러운 색상) ===== */
+    /* ===== 히어로 섹션 ===== */
     .hero-section {
         background: linear-gradient(135deg, #e8f4f8 0%, #d4e5f7 50%, #c9daf8 100%);
         border-radius: 28px;
@@ -93,7 +93,7 @@ st.markdown("""
 
     .hero-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        background: linear-gradient(135deg, #7c3aed, #c026d3);
         color: white;
         padding: 10px 28px;
         border-radius: 50px;
@@ -103,7 +103,13 @@ st.markdown("""
         position: relative;
         z-index: 1;
         letter-spacing: 1.5px;
-        box-shadow: 0 4px 15px rgba(99,102,241,0.3);
+        box-shadow: 0 4px 15px rgba(124,58,237,0.4);
+        animation: badge-glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes badge-glow {
+        from { box-shadow: 0 4px 15px rgba(124,58,237,0.4); }
+        to { box-shadow: 0 4px 25px rgba(192,38,211,0.6); }
     }
 
     /* ===== 섹션 헤더 ===== */
@@ -135,7 +141,7 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
 
-    .section-icon.ai { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    .section-icon.ai { background: linear-gradient(135deg, #7c3aed, #c026d3); }
     .section-icon.youtube { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .section-icon.study { background: linear-gradient(135deg, #10b981, #059669); }
     .section-icon.exam { background: linear-gradient(135deg, #f59e0b, #d97706); }
@@ -147,10 +153,10 @@ st.markdown("""
         padding: 35px;
         margin: 20px 0;
         box-shadow: 
-            0 20px 60px rgba(99,102,241,0.1),
+            0 20px 60px rgba(124,58,237,0.1),
             0 1px 3px rgba(0,0,0,0.05),
             inset 0 1px 0 rgba(255,255,255,0.9);
-        border: 1px solid rgba(99,102,241,0.1);
+        border: 1px solid rgba(124,58,237,0.1);
         position: relative;
         overflow: hidden;
     }
@@ -162,7 +168,7 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
+        background: linear-gradient(90deg, #7c3aed, #c026d3, #ec4899);
     }
 
     .voice-premium-container::after {
@@ -172,7 +178,7 @@ st.markdown("""
         right: -80px;
         width: 200px;
         height: 200px;
-        background: radial-gradient(circle, rgba(99,102,241,0.05) 0%, transparent 70%);
+        background: radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%);
         border-radius: 50%;
     }
 
@@ -188,13 +194,13 @@ st.markdown("""
     .voice-icon-wrapper {
         width: 52px;
         height: 52px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        background: linear-gradient(135deg, #7c3aed, #c026d3);
         border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1.6rem;
-        box-shadow: 0 8px 20px rgba(99,102,241,0.3);
+        box-shadow: 0 8px 20px rgba(124,58,237,0.3);
     }
 
     .voice-title {
@@ -211,7 +217,7 @@ st.markdown("""
     }
 
     #voiceBtn {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
         color: white;
         border: none;
         padding: 22px 35px;
@@ -219,8 +225,8 @@ st.markdown("""
         border-radius: 16px;
         cursor: pointer;
         box-shadow: 
-            0 10px 30px rgba(99,102,241,0.35),
-            0 2px 4px rgba(99,102,241,0.2);
+            0 10px 30px rgba(124,58,237,0.35),
+            0 2px 4px rgba(124,58,237,0.2);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         font-weight: 700;
         width: 100%;
@@ -237,8 +243,8 @@ st.markdown("""
     #voiceBtn:hover {
         transform: translateY(-3px);
         box-shadow: 
-            0 15px 40px rgba(99,102,241,0.4),
-            0 5px 10px rgba(99,102,241,0.2);
+            0 15px 40px rgba(124,58,237,0.4),
+            0 5px 10px rgba(124,58,237,0.2);
     }
 
     #voiceBtn:active {
@@ -280,7 +286,7 @@ st.markdown("""
         position: relative;
         z-index: 1;
         padding: 12px;
-        background: rgba(99,102,241,0.05);
+        background: rgba(124,58,237,0.05);
         border-radius: 12px;
     }
 
@@ -364,11 +370,11 @@ st.markdown("""
 
     /* ===== YouTube 카드 ===== */
     .youtube-card {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
         border-radius: 20px;
         padding: 24px;
         margin: 15px 0;
-        box-shadow: 0 12px 40px rgba(99,102,241,0.25);
+        box-shadow: 0 12px 40px rgba(124,58,237,0.25);
         color: white;
         position: relative;
         overflow: hidden;
@@ -413,7 +419,7 @@ st.markdown("""
     .play-button {
         display: block;
         background: white;
-        color: #6366f1;
+        color: #7c3aed;
         padding: 16px;
         border-radius: 12px;
         text-align: center;
@@ -432,7 +438,7 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0,0,0,0.2);
         text-decoration: none;
-        color: #6366f1;
+        color: #7c3aed;
     }
 
     .server-links {
@@ -464,7 +470,7 @@ st.markdown("""
         text-decoration: none;
     }
 
-    /* ===== AI 응답 ===== */
+    /* ===== AI 응답 (Ultra 버전) ===== */
     .ai-response {
         background: white;
         border-radius: 20px;
@@ -473,14 +479,29 @@ st.markdown("""
         box-shadow: 
             0 10px 40px rgba(0,0,0,0.06),
             0 1px 3px rgba(0,0,0,0.03);
-        border: 1px solid rgba(99,102,241,0.1);
+        border: 1px solid rgba(124,58,237,0.1);
         line-height: 2;
         font-size: 1.02rem;
         color: #1e293b;
+        position: relative;
+    }
+
+    .ai-response::before {
+        content: '🎓 ULTRA AI';
+        position: absolute;
+        top: -12px;
+        left: 20px;
+        background: linear-gradient(135deg, #7c3aed, #c026d3);
+        color: white;
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 1px;
     }
 
     .ai-response h1, .ai-response h2, .ai-response h3 {
-        color: #4338ca;
+        color: #7c3aed;
         margin-top: 24px;
         font-weight: 700;
     }
@@ -490,7 +511,7 @@ st.markdown("""
     .ai-response h3 { font-size: 1.15rem; }
 
     .ai-response code {
-        background: #f1f5f9;
+        background: #faf5ff;
         padding: 3px 10px;
         border-radius: 6px;
         color: #7c3aed;
@@ -517,15 +538,15 @@ st.markdown("""
     }
 
     .ai-response strong {
-        color: #4338ca;
+        color: #7c3aed;
         font-weight: 700;
     }
 
     .ai-response blockquote {
-        border-left: 4px solid #6366f1;
+        border-left: 4px solid #c026d3;
         padding: 15px 22px;
         margin: 18px 0;
-        background: #f5f3ff;
+        background: #fdf4ff;
         border-radius: 0 12px 12px 0;
         font-style: normal;
     }
@@ -543,9 +564,9 @@ st.markdown("""
     }
 
     .ai-response th {
-        background: #f8fafc;
+        background: #faf5ff;
         font-weight: 700;
-        color: #475569;
+        color: #7c3aed;
     }
 
     /* ===== 채널/정보 카드 ===== */
@@ -560,9 +581,9 @@ st.markdown("""
     }
 
     .channel-card:hover {
-        box-shadow: 0 8px 30px rgba(99,102,241,0.12);
+        box-shadow: 0 8px 30px rgba(124,58,237,0.12);
         transform: translateY(-3px);
-        border-color: rgba(99,102,241,0.2);
+        border-color: rgba(124,58,237,0.2);
     }
 
     .channel-card h4 {
@@ -579,13 +600,13 @@ st.markdown("""
     }
 
     .channel-card a {
-        color: #6366f1;
+        color: #7c3aed;
         text-decoration: none;
         font-weight: 700;
     }
 
     .channel-card a:hover {
-        color: #4338ca;
+        color: #6d28d9;
         text-decoration: underline;
     }
 
@@ -600,7 +621,7 @@ st.markdown("""
     }
 
     .info-card:hover {
-        box-shadow: 0 10px 35px rgba(99,102,241,0.1);
+        box-shadow: 0 10px 35px rgba(124,58,237,0.1);
         transform: translateY(-2px);
     }
 
@@ -617,14 +638,14 @@ st.markdown("""
     }
 
     .info-card a {
-        color: #6366f1;
+        color: #7c3aed;
         text-decoration: none;
         font-weight: 600;
         transition: color 0.2s;
     }
 
     .info-card a:hover {
-        color: #4338ca;
+        color: #6d28d9;
         text-decoration: underline;
     }
 
@@ -645,9 +666,9 @@ st.markdown("""
     }
 
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%) !important;
         color: white !important;
-        box-shadow: 0 4px 15px rgba(99,102,241,0.35);
+        box-shadow: 0 4px 15px rgba(124,58,237,0.35);
     }
 
     /* ===== 버튼 스타일 ===== */
@@ -676,8 +697,8 @@ st.markdown("""
     }
 
     .stTextInput > div > div > input:focus {
-        border-color: #6366f1;
-        box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 4px rgba(124,58,237,0.1);
     }
 
     /* ===== Expander ===== */
@@ -700,7 +721,7 @@ st.markdown("""
     hr {
         border: none;
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(99,102,241,0.2), transparent);
+        background: linear-gradient(90deg, transparent, rgba(124,58,237,0.2), transparent);
         margin: 35px 0;
     }
 
@@ -724,7 +745,7 @@ st.markdown("""
         left: -60px;
         width: 180px;
         height: 180px;
-        background: rgba(99,102,241,0.06);
+        background: rgba(124,58,237,0.06);
         border-radius: 50%;
     }
 
@@ -778,11 +799,11 @@ st.markdown("""
         background: #f1f5f9;
     }
     ::-webkit-scrollbar-thumb {
-        background: #c7d2fe;
+        background: #ddd6fe;
         border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #6366f1;
+        background: #7c3aed;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -956,7 +977,7 @@ def create_voice_input():
                     btnText.textContent = '듣는 중... (클릭하면 중지)';
                     micIcon.textContent = '🔴';
                     status.innerHTML = '🎧 지금 말씀하세요...';
-                    status.style.color = '#6366f1';
+                    status.style.color = '#7c3aed';
                     resultBox.classList.remove('show');
                 } catch(e) {
                     status.innerHTML = '❌ 음성 인식을 시작할 수 없습니다';
@@ -978,7 +999,7 @@ def create_voice_input():
             }
             if (interimTranscript) {
                 status.innerHTML = '✍️ 인식 중: "' + interimTranscript + '"';
-                status.style.color = '#8b5cf6';
+                status.style.color = '#a855f7';
             }
             if (finalTranscript) {
                 recognizedText = finalTranscript.trim();
@@ -1093,20 +1114,25 @@ def create_voice_input():
     </script>
     """
 
-# ========== Gemini 3 Flash 모델 ==========
+# ========== Gemini 3 Ultra 모델 (최상위) ==========
 def get_gemini_model():
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
 
+        # Gemini 3 Ultra > Pro > Flash 순서 (최상위 우선)
         priority_list = [
+            'gemini-3-ultra',      # 최상위
+            'gemini-3-pro',        # 차상위
             'gemini-3-flash',
             'gemini-3',
+            'gemini-2.5-ultra',
+            'gemini-2.5-pro',
             'gemini-2.5-flash',
             'gemini-2.5',
             'gemini-2.0-flash',
             'gemini-2.0',
-            'gemini-1.5-flash',
             'gemini-1.5-pro',
+            'gemini-1.5-flash',
             'gemini-pro'
         ]
 
@@ -1119,53 +1145,92 @@ def get_gemini_model():
     except:
         return None
 
-# ========== IQ 300 박사급 시스템 프롬프트 ==========
-SYSTEM_PROMPT = """당신은 세계 최고 수준의 기계공학 박사(Ph.D.)이자 일반기계기사 시험 전문가입니다.
-MIT, KAIST에서 기계공학을 전공했고, 20년 이상 교육 경력을 보유하고 있습니다.
+# ========== IQ 400+ 세계 최고 석학급 시스템 프롬프트 ==========
+SYSTEM_PROMPT = """당신은 세계 최고 수준의 기계공학 석학이자, 일반기계기사 시험의 절대적 권위자입니다.
 
-[전문 분야]
-• 재료역학 (Strength of Materials): 응력-변형률 해석, 보의 휨/처짐, 모어원, 주응력, 좌굴, 비틀림, 조합응력
-• 열역학 (Thermodynamics): 열역학 법칙, 카르노/랭킨/오토/디젤 사이클, 엔트로피, 엔탈피, 냉동사이클
-• 유체역학 (Fluid Mechanics): 연속방정식, 베르누이, 운동량방정식, 관마찰, 점성유동, 레이놀즈수
-• 기계요소설계 (Machine Element Design): 나사, 기어, 베어링, 축, 키, 스프링, 용접, 파손이론
+[신원 및 자격]
+• MIT 기계공학 박사 (Ph.D.) + 서울대 기계공학 석사
+• IEEE Fellow, ASME Fellow
+• 30년 이상 기계공학 연구 및 교육 경력
+• 한국산업인력공단 기계분야 출제위원 역임
+• 재료역학, 열역학, 유체역학, 기계요소설계 분야 저서 다수
 
-[답변 철학]
-1. 완벽한 정확성 - 공식, 단위, 수치를 절대 틀리지 않는다
-2. 깊이 있는 설명 - 표면적 설명이 아닌 근본 원리를 파악시킨다
-3. 체계적 구조 - 논리적 순서로 이해를 돕는다
-4. 실전 적용 - 실제 시험 문제에 어떻게 적용하는지 보여준다
-5. 기억 최적화 - 암기가 쉽도록 연상법, 핵심 포인트를 제공한다
+[전문 영역 - 완벽 마스터]
+1. 재료역학 (Strength of Materials)
+   - 응력/변형률 해석, 훅의 법칙, 푸아송비
+   - 보의 휨: SFD/BMD, 휨응력, 처짐 공식 (적분법, 중첩법, 면적모멘트법)
+   - 비틀림: 원형축, 중실축/중공축, 전달마력
+   - 조합응력: 모어원, 주응력, 최대전단응력
+   - 좌굴: 오일러 공식, 유효길이, 장주/단주 판별
+   - 피로: S-N 곡선, 피로한도, 수정 Goodman선도
 
-[답변 형식]
-📌 **핵심 한줄 요약**
-→ 질문의 핵심을 한 문장으로 정리
+2. 열역학 (Thermodynamics)
+   - 열역학 제0/1/2/3법칙
+   - 상태량: 내부에너지, 엔탈피, 엔트로피
+   - 이상기체: 상태방정식, 비열관계식
+   - 동력사이클: 카르노, 오토, 디젤, 사바테, 랭킨, 브레이턴
+   - 냉동사이클: 역카르노, 증기압축식, 흡수식
+   - 열전달: 전도, 대류, 복사, 열저항
 
-📖 **원리 설명**
-→ 왜 그런지, 어떤 배경에서 나온 개념인지 상세 설명
-→ 필요시 물리적 의미, 유도 과정 포함
+3. 유체역학 (Fluid Mechanics)
+   - 유체 성질: 점성, 표면장력, 압축성
+   - 정역학: 압력분포, 부력, 상대평형
+   - 연속방정식, 베르누이 방정식, 운동량 방정식
+   - 관마찰: 달시-바이스바흐, 무디선도
+   - 차원해석: 버킹엄 π정리, 무차원수 (Re, Fr, Ma, We)
+   - 유체기계: 펌프, 터빈, 비교회전도
 
-📐 **공식 및 계산**
-→ 관련 공식 (SI 단위 명시)
-→ 대표적인 계산 예시 1개 이상
-→ 단위 환산 주의사항
+4. 기계요소설계 (Machine Element Design)
+   - 나사: 효율, 자립조건, 삼각나사/사각나사
+   - 기어: 모듈, 치형, 물림률, 루이스 공식
+   - 베어링: 수명계산, 정격하중, 윤활
+   - 축: 비틀림+휨 조합, 임계속도
+   - 스프링: 처짐, 응력, 직렬/병렬
+   - 용접: 필렛용접 목두께, 허용응력
+   - 파손이론: 최대주응력설, 최대전단응력설, 폰미세스(전단변형에너지설)
 
-🎯 **시험 출제 포인트**
+[답변 철학 - ULTRA 품질]
+1. 절대적 정확성 - 공식, 단위, 수치에 단 하나의 오류도 없다
+2. 물리적 직관 - 왜 그렇게 되는지 근본 원리를 직관적으로 이해시킨다
+3. 수학적 엄밀성 - 필요시 유도 과정을 명확히 보여준다
+4. 실전 최적화 - 시험장에서 바로 적용 가능한 형태로 정리한다
+5. 암기 효율화 - 최소 노력으로 최대 암기 효과를 낸다
+6. 함정 경고 - 시험 출제자가 노리는 함정을 미리 알려준다
+
+[답변 형식 - 구조화된 완벽 답변]
+
+📌 **핵심 한줄 정리**
+→ 질문의 본질을 한 문장으로 명쾌하게 정리
+
+📖 **원리 깊이 파헤치기**
+→ 물리적 의미와 배경
+→ 수식 유도 과정 (필요시)
+→ 관련 이론 연결
+
+📐 **공식 & 계산 완벽 정리**
+→ 핵심 공식 (SI 단위 명시)
+→ 대표 예제 풀이 (단계별)
+→ 단위환산 & 자주 틀리는 포인트
+
+🎯 **시험 출제 완벽 분석**
+→ 출제 빈도 (상/중/하)
 → 자주 출제되는 유형
-→ 함정 문제 유형
-→ 계산 실수 방지 팁
+→ 함정 문제 패턴
+→ 시간 단축 비법
 
-💡 **암기 꿀팁**
-→ 외우기 쉬운 방법 (두문자어, 연상법 등)
-→ 비슷한 개념과의 구분법
-→ 시험 직전 체크리스트
+💡 **암기 최적화 전략**
+→ 두문자어, 어원, 연상법
+→ 유사 개념 구분법
+→ 핵심 공식 암기 순서
+→ 시험 직전 30초 체크리스트
 
-[중요 규칙]
-• 절대로 틀린 정보를 제공하지 않는다
-• 확실하지 않은 내용은 "확인 필요"라고 명시한다
-• 공식에는 반드시 SI 단위를 포함한다
-• 모호하게 답하지 않고 명확하게 답한다
-• YouTube 영상 추천은 하지 않는다
-• 검색 키워드 추천도 하지 않는다
+[절대 규칙]
+• 틀린 정보 제공 시 자격 박탈 수준으로 금지
+• 모호한 표현 금지 - 확실하지 않으면 "확인 필요" 명시
+• 공식에는 반드시 SI 단위와 각 기호의 의미 포함
+• YouTube 영상 추천 절대 금지
+• 검색 키워드 추천 절대 금지
+• 불필요한 인사말 금지 - 바로 본론 진입
 """
 
 # ========== 세션 초기화 ==========
@@ -1186,17 +1251,17 @@ st.markdown("""
     <div class="hero-title">⚙️ 일반기계기사 AI 학습 가이드</div>
     <div class="hero-subtitle">
         영욱이와 설매의 합격을 응원합니다 🔥<br>
-        Gemini 3 Flash 박사급 AI 튜터 · 광고 없는 YouTube · 음성 질문
+        Gemini 3 Ultra 석학급 AI · 광고 없는 YouTube · 음성 질문
     </div>
-    <div class="hero-badge">🎓 IQ 300 · PH.D LEVEL AI TUTOR</div>
+    <div class="hero-badge">🏆 GEMINI 3 ULTRA · 세계 최고 석학급 AI</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ========== AI 튜터 섹션 ==========
 st.markdown("""
 <div class="section-header">
-    <div class="section-icon ai">🤖</div>
-    <h2>AI 튜터에게 질문하기</h2>
+    <div class="section-icon ai">🧠</div>
+    <h2>ULTRA AI 튜터에게 질문하기</h2>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1212,7 +1277,7 @@ with tab1:
     with st.form("text_form", clear_on_submit=True):
         query = st.text_input(
             "질문을 입력하세요",
-            placeholder="예: 재료역학에서 모어원 쉽게 설명해줘",
+            placeholder="예: 모어원에서 주응력과 최대전단응력 구하는 법 설명해줘",
             label_visibility="collapsed",
             key="text_query"
         )
@@ -1223,7 +1288,7 @@ with tab1:
             try:
                 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-                with st.spinner("🎓 박사급 AI가 최고의 답변을 준비 중..."):
+                with st.spinner("🧠 ULTRA AI가 석학급 답변을 준비 중..."):
                     model_name = get_gemini_model()
 
                     if model_name:
@@ -1235,9 +1300,10 @@ with tab1:
                         user_prompt = f"""[학생 질문]
 {query}
 
-위 질문에 대해 일반기계기사 시험을 준비하는 학생에게 완벽한 답변을 작성하세요.
+위 질문에 대해 일반기계기사 시험을 준비하는 학생에게 석학 수준의 완벽한 답변을 작성하세요.
 정해진 형식(📌📖📐🎯💡)을 정확히 따르세요.
-YouTube 영상 추천이나 검색 키워드는 포함하지 마세요."""
+YouTube 영상 추천이나 검색 키워드는 절대 포함하지 마세요.
+인사말 없이 바로 본론으로 시작하세요."""
 
                         response = model.generate_content(user_prompt)
                         st.session_state.ai_response = response.text
@@ -1268,7 +1334,7 @@ with tab2:
     with st.form("image_form", clear_on_submit=True):
         image_query = st.text_input(
             "이미지에 대한 질문 (선택사항)",
-            placeholder="예: 이 문제 풀이 과정을 단계별로 설명해줘",
+            placeholder="예: 이 문제의 풀이 과정을 단계별로 자세히 설명해줘",
             label_visibility="collapsed"
         )
         image_submit = st.form_submit_button("🔍 이미지 분석", use_container_width=True)
@@ -1278,7 +1344,7 @@ with tab2:
             try:
                 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-                with st.spinner("🎓 박사급 AI가 이미지를 정밀 분석 중..."):
+                with st.spinner("🧠 ULTRA AI가 이미지를 정밀 분석 중..."):
                     model_name = get_gemini_model()
 
                     if model_name:
@@ -1291,14 +1357,15 @@ with tab2:
                         img_prompt = f"""[이미지 분석 요청]
 {f'학생 질문: {image_query}' if image_query else '이 이미지를 분석하고 상세히 설명해주세요'}
 
-이미지를 분석한 후 다음 형식으로 답변하세요:
+이미지를 분석한 후 다음 형식으로 석학 수준의 완벽한 답변을 작성하세요:
 📌 이미지 내용 한줄 요약
-📖 관련 개념/이론 상세 설명
-📐 문제라면 완전한 단계별 풀이 (공식, 단위, 계산 포함)
-🎯 시험 출제 포인트 및 주의사항
-💡 유사 문제 대비 암기 팁
+📖 관련 개념/이론 상세 설명 (물리적 의미 포함)
+📐 문제라면 완전한 단계별 풀이 (공식, 단위, 계산 과정 전체)
+🎯 시험 출제 포인트 및 함정 주의사항
+💡 유사 문제 대비 암기 전략
 
-YouTube 영상 추천이나 검색 키워드는 포함하지 마세요."""
+YouTube 영상 추천이나 검색 키워드는 절대 포함하지 마세요.
+인사말 없이 바로 본론으로 시작하세요."""
 
                         response = model.generate_content([img_prompt, image])
                         st.session_state.ai_response = response.text
@@ -1346,7 +1413,7 @@ if st.session_state.ai_response:
                     st.error("❌ 음성 생성 실패")
 
     if st.session_state.model_name:
-        st.caption(f"🤖 사용 모델: `{st.session_state.model_name}`")
+        st.caption(f"🧠 사용 모델: `{st.session_state.model_name}` (Ultra급 추론)")
 
     if st.session_state.audio_playing:
         st.markdown("##### 🎧 음성 재생")
@@ -1371,7 +1438,7 @@ if st.session_state.ai_response:
     response_text = format_youtube_links(response_text)
     response_text = add_search_links(response_text)
 
-    st.markdown("##### 🎓 박사급 AI 답변")
+    st.markdown("##### 🎓 ULTRA AI 석학급 답변")
     st.markdown(f'<div class="ai-response">{response_text}</div>', unsafe_allow_html=True)
 
 st.markdown("---")
@@ -1486,12 +1553,13 @@ st.markdown("""
 <div class="footer-section">
     <h2>🔥 일반기계기사 합격을 응원합니다! 🔥</h2>
     <p style="color: #4a6d8c; font-size: 1.08rem; margin: 15px 0; line-height: 1.9;">
+        🧠 Gemini 3 Ultra 석학급 AI로 완벽하게 준비하세요!<br>
         🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!<br>
         ✅ 모든 YouTube 영상 광고 100% 차단 (Invidious 제공)
     </p>
     <div style="margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(0,0,0,0.08);">
         <p style="color: #7a9bb8; font-size: 0.88rem; margin: 0;">
-            Made with ❤️ by AI &nbsp;·&nbsp; Powered by Gemini 3 Flash + Edge TTS + Invidious + Web Speech API
+            Made with ❤️ by AI &nbsp;·&nbsp; Powered by Gemini 3 Ultra + Edge TTS + Invidious + Web Speech API
         </p>
         <p style="color: #94a3b8; font-size: 0.8rem; margin: 10px 0 0 0;">
             💬 음성 인식은 Chrome, Edge, 삼성 인터넷 브라우저에서 작동합니다
