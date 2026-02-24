@@ -576,19 +576,20 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 🎬 완전 광고 없는 YouTube 플레이어 (로그인 경고 제거) ==========
+# ========== 🎬 완전 광고 없는 YouTube 플레이어 (봇 체크 없는 안정 서버) ==========
 def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
-    """Invidious 기반 광고 없는 플레이어 (로그인 경고 없음)"""
+    """Invidious 기반 광고 없는 플레이어 (봇 체크 없음)"""
     
+    # 2025년 1월 기준 봇 체크 없는 안정 서버들
     invidious_instances = [
-        ("yewtu.be", "주 서버"),
-        ("inv.nadeko.net", "서버 2"),
+        ("iv.melmac.space", "주 서버"),
+        ("invidious.fdn.fr", "서버 2"),
         ("yt.artemislena.eu", "서버 3"),
         ("inv.tux.pizza", "서버 4"),
-        ("invidious.fdn.fr", "서버 5")
+        ("inv.nadeko.net", "서버 5")
     ]
     
-    # 로그인 경고 안 뜨는 파라미터 추가
+    # 로그인 경고 없고 봇 체크 없는 설정
     main_embed = f"https://{invidious_instances[0][0]}/embed/{video_id}?autoplay=0&quality=dash&local=true"
     
     server_buttons = ""
@@ -654,7 +655,7 @@ def format_youtube_links(text):
 
 def make_links_clickable(text):
     """일반 URL 클릭 가능하게"""
-    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|invidious\.|inv\.|yewtu\.)[^\s\)]+)'
+    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|invidious\.|inv\.|iv\.|yt\.)[^\s\)]+)'
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?')
@@ -696,7 +697,7 @@ def add_youtube_search_links(text):
     for keyword in all_keywords:
         if keyword in modified_text and keyword not in used_keywords:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
-            invidious_search = f"https://yewtu.be/search?q={search_query}"
+            invidious_search = f"https://iv.melmac.space/search?q={search_query}"
             
             pattern = rf'\b({re.escape(keyword)})\b'
             
@@ -984,34 +985,34 @@ st.divider()
 # ========== 광고 없는 채널 추천 ==========
 st.header("📺 1. 추천 유튜브 채널 (광고 없음)")
 
-st.info("💡 **모든 링크는 Invidious를 통해 광고 없이 재생됩니다! 로그인 불필요!**")
+st.info("💡 **모든 링크는 Invidious를 통해 광고 없이 재생됩니다! 봇 체크 없음!**")
 
 col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
     st.markdown("""
-👉 [**기계달인**](https://yewtu.be/search?q=기계달인+일반기계기사)  
+👉 [**기계달인**](https://iv.melmac.space/search?q=기계달인+일반기계기사)  
 (전과목 강의)
 
-👉 [**에듀윌**](https://yewtu.be/search?q=에듀윌+일반기계기사)  
+👉 [**에듀윌**](https://iv.melmac.space/search?q=에듀윌+일반기계기사)  
 (핵심 요약)
 """)
 
 with col_ch2:
     st.markdown("""
-👉 [**메가파이**](https://yewtu.be/search?q=메가파이+일반기계기사)  
+👉 [**메가파이**](https://iv.melmac.space/search?q=메가파이+일반기계기사)  
 (자격증 꿀팁)
 
-👉 [**한솔아카데미**](https://yewtu.be/search?q=한솔아카데미+일반기계기사)  
+👉 [**한솔아카데미**](https://iv.melmac.space/search?q=한솔아카데미+일반기계기사)  
 (기출 해설)
 """)
 
 with col_ch3:
     st.markdown("""
-👉 [**공밀레**](https://yewtu.be/search?q=공밀레+재료역학)  
+👉 [**공밀레**](https://iv.melmac.space/search?q=공밀레+재료역학)  
 (개념 이해)
 
-👉 [**Learn Engineering**](https://yewtu.be/search?q=Learn+Engineering)  
+👉 [**Learn Engineering**](https://iv.melmac.space/search?q=Learn+Engineering)  
 (영문/애니메이션)
 """)
 
@@ -1022,39 +1023,39 @@ st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
     st.markdown("""
-- [🧱 기초 강의](https://yewtu.be/search?q=재료역학+기초+강의)
-- [📉 SFD/BMD 그리기](https://yewtu.be/search?q=SFD+BMD+그리는법)
-- [➰ 보의 처짐](https://yewtu.be/search?q=재료역학+보의+처짐)
-- [🌀 모어원](https://yewtu.be/search?q=재료역학+모어원)
-- [🏛️ 좌굴 공식](https://yewtu.be/search?q=재료역학+좌굴+공식)
-- [📝 기출문제](https://yewtu.be/search?q=일반기계기사+재료역학+기출문제)
+- [🧱 기초 강의](https://iv.melmac.space/search?q=재료역학+기초+강의)
+- [📉 SFD/BMD 그리기](https://iv.melmac.space/search?q=SFD+BMD+그리는법)
+- [➰ 보의 처짐](https://iv.melmac.space/search?q=재료역학+보의+처짐)
+- [🌀 모어원](https://iv.melmac.space/search?q=재료역학+모어원)
+- [🏛️ 좌굴 공식](https://iv.melmac.space/search?q=재료역학+좌굴+공식)
+- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+재료역학+기출문제)
 """)
 
 with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
     st.markdown("""
-- [🔥 열역학 법칙](https://yewtu.be/search?q=열역학+법칙+설명)
-- [🔄 사이클 정리](https://yewtu.be/search?q=열역학+사이클+정리)
-- [🌡️ 엔트로피](https://yewtu.be/search?q=열역학+엔트로피)
-- [💨 냉동 사이클](https://yewtu.be/search?q=일반기계기사+냉동사이클)
-- [📝 기출문제](https://yewtu.be/search?q=일반기계기사+열역학+기출)
+- [🔥 열역학 법칙](https://iv.melmac.space/search?q=열역학+법칙+설명)
+- [🔄 사이클 정리](https://iv.melmac.space/search?q=열역학+사이클+정리)
+- [🌡️ 엔트로피](https://iv.melmac.space/search?q=열역학+엔트로피)
+- [💨 냉동 사이클](https://iv.melmac.space/search?q=일반기계기사+냉동사이클)
+- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+열역학+기출)
 """)
 
 with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
     st.markdown("""
-- [💧 유체 성질](https://yewtu.be/search?q=유체역학+점성계수)
-- [🌪️ 베르누이 방정식](https://yewtu.be/search?q=베르누이+방정식+문제풀이)
-- [📏 관로 마찰](https://yewtu.be/search?q=달시+바이스바흐+공식)
-- [⚡ 운동량 방정식](https://yewtu.be/search?q=유체역학+운동량방정식)
-- [📝 기출문제](https://yewtu.be/search?q=일반기계기사+유체역학+기출)
+- [💧 유체 성질](https://iv.melmac.space/search?q=유체역학+점성계수)
+- [🌪️ 베르누이 방정식](https://iv.melmac.space/search?q=베르누이+방정식+문제풀이)
+- [📏 관로 마찰](https://iv.melmac.space/search?q=달시+바이스바흐+공식)
+- [⚡ 운동량 방정식](https://iv.melmac.space/search?q=유체역학+운동량방정식)
+- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+유체역학+기출)
 """)
 
 with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
     st.markdown("""
-- [⚙️ 기어/베어링](https://yewtu.be/search?q=기계요소설계+기어+베어링)
-- [🔩 나사/볼트](https://yewtu.be/search?q=기계요소설계+나사+효율)
-- [🛡️ 파손 이론](https://yewtu.be/search?q=기계설계+파손이론)
-- [🔗 축/커플링](https://yewtu.be/search?q=기계요소설계+축+설계)
-- [📝 기출문제](https://yewtu.be/search?q=일반기계기사+기계요소설계+기출)
+- [⚙️ 기어/베어링](https://iv.melmac.space/search?q=기계요소설계+기어+베어링)
+- [🔩 나사/볼트](https://iv.melmac.space/search?q=기계요소설계+나사+효율)
+- [🛡️ 파손 이론](https://iv.melmac.space/search?q=기계설계+파손이론)
+- [🔗 축/커플링](https://iv.melmac.space/search?q=기계요소설계+축+설계)
+- [📝 기출문제](https://iv.melmac.space/search?q=일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
@@ -1067,18 +1068,18 @@ col_prac1, col_prac2 = st.columns(2)
 with col_prac1:
     st.subheader("📝 필답형")
     st.markdown("""
-- [📖 요약 정리](https://yewtu.be/search?q=일반기계기사+필답형+요약)
-- [✍️ 기출 풀이](https://yewtu.be/search?q=일반기계기사+필답형+기출)
-- [🎯 공식 정리](https://yewtu.be/search?q=일반기계기사+필답형+공식)
+- [📖 요약 정리](https://iv.melmac.space/search?q=일반기계기사+필답형+요약)
+- [✍️ 기출 풀이](https://iv.melmac.space/search?q=일반기계기사+필답형+기출)
+- [🎯 공식 정리](https://iv.melmac.space/search?q=일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
     st.subheader("💻 작업형")
     st.markdown("""
-- [🖱️ 인벤터 기초](https://yewtu.be/search?q=일반기계기사+인벤터+기초)
-- [📐 투상 연습](https://yewtu.be/search?q=일반기계기사+투상+연습)
-- [📏 거칠기/공차](https://yewtu.be/search?q=일반기계기사+거칠기+기하공차)
-- [⚡ 기출 실습](https://yewtu.be/search?q=일반기계기사+작업형+기출)
+- [🖱️ 인벤터 기초](https://iv.melmac.space/search?q=일반기계기사+인벤터+기초)
+- [📐 투상 연습](https://iv.melmac.space/search?q=일반기계기사+투상+연습)
+- [📏 거칠기/공차](https://iv.melmac.space/search?q=일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습](https://iv.melmac.space/search?q=일반기계기사+작업형+기출)
 """)
 
 st.divider()
@@ -1109,7 +1110,7 @@ with st.expander("📖 추천 자료", expanded=False):
 ### 🌐 사이트
 - [큐넷](https://www.q-net.or.kr) - 시험 접수
 - [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
-- [공학용 계산기](https://yewtu.be/search?q=공학용계산기+사용법)
+- [공학용 계산기](https://iv.melmac.space/search?q=공학용계산기+사용법)
 """)
 
 st.divider()
@@ -1121,7 +1122,8 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 
 **Invidious** - 오픈소스 YouTube 프론트엔드
 - ✅ **광고 100% 차단** (YouTube Premium 불필요)
-- ✅ **로그인 경고 없음** (local=true 파라미터)
+- ✅ **로그인 경고 없음**
+- ✅ **봇 체크 없음** (iv.melmac.space 서버)
 - ✅ 스폰서블록 자동 스킵
 - ✅ 백그라운드 재생 지원
 - ✅ 1080p/4K 지원
@@ -1134,28 +1136,23 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 2. [LibreTube 앱](https://libretube.dev) 설치
 
 **iPhone:**
-1. Safari에서 https://yewtu.be 북마크
+1. Safari에서 https://iv.melmac.space 북마크
 2. 또는 이 앱에서 제공하는 링크 클릭!
 
 **모든 기기:**
 - 🎯 이 앱의 모든 링크는 자동으로 광고 없음!
 
 ### 🌐 Invidious 공식 인스턴스 (모두 안전함)
-- https://yewtu.be (주 서버 - 로그인 경고 없음)
-- https://inv.nadeko.net (백업 1)
+- https://iv.melmac.space (주 서버 - 봇 체크 없음)
+- https://invidious.fdn.fr (백업 1)
 - https://yt.artemislena.eu (백업 2)
 - https://inv.tux.pizza (백업 3)
-- https://invidious.fdn.fr (백업 4)
+- https://inv.nadeko.net (백업 4)
 
 ### 🔒 왜 광고가 안 나올까?
 Invidious는 YouTube 데이터를 직접 추출해서  
 광고 없는 순수 비디오 스트림만 가져옵니다.  
 **100% 합법**이고 구글도 차단 못 합니다!
-
-### ✅ 로그인 경고가 안 뜨는 이유
-- `?local=true` 파라미터로 로컬 재생 모드 활성화
-- yewtu.be 서버는 로그인 경고 최소화 설정
-- 혹시 경고 뜨면 그냥 X 버튼 눌러도 정상 시청 가능!
 """)
 
 st.divider()
@@ -1171,7 +1168,7 @@ st.markdown("""
         ✅ 모든 유튜브 영상 광고 100% 차단! (Invidious 제공)
     </p>
     <p style='font-size: 0.85rem; margin-top: 5px; color: #059669;'>
-        🚫 YouTube Premium 없어도 광고 0개! 로그인도 불필요!
+        🚫 YouTube Premium 없어도 광고 0개! 봇 체크도 없음!
     </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
         Made with ❤️ by AI<br>
