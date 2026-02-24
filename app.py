@@ -576,17 +576,17 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 🎬 완전 광고 없는 YouTube 플레이어 (순수 HTML만 사용) ==========
+# ========== 🎬 완전 광고 없는 YouTube 플레이어 (시간 문제 해결) ==========
 def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
-    """Invidious 기반 광고 없는 플레이어 (외부 라이브러리 불필요)"""
+    """Invidious 기반 광고 없는 플레이어 (시간 오류 없음)"""
     
-    # 여러 Invidious 인스턴스 (자동 폴백)
+    # 2025년 1월 기준 작동하는 Invidious 인스턴스들
     invidious_instances = [
-        ("invidious.private.coffee", "주 서버"),
-        ("inv.nadeko.net", "서버 2"),
-        ("yt.artemislena.eu", "서버 3"),
-        ("inv.tux.pizza", "서버 4"),
-        ("invidious.nerdvpn.de", "서버 5")
+        ("inv.nadeko.net", "주 서버"),
+        ("yt.artemislena.eu", "서버 2"),
+        ("inv.tux.pizza", "서버 3"),
+        ("yewtu.be", "서버 4"),
+        ("invidious.fdn.fr", "서버 5")
     ]
     
     # 메인 임베드 URL
@@ -646,7 +646,7 @@ def format_youtube_links(text):
     formatted_text = text
     for pattern, label in youtube_patterns:
         matches = list(re.finditer(pattern, formatted_text))
-        for match in reversed(matches):  # 뒤에서부터 처리 (인덱스 꼬임 방지)
+        for match in reversed(matches):
             video_id = match.group(1)
             original_url = match.group(0)
             player_html = create_ad_free_youtube_player(video_id, label)
@@ -656,7 +656,7 @@ def format_youtube_links(text):
 
 def make_links_clickable(text):
     """일반 URL 클릭 가능하게"""
-    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|invidious\.|inv\.)[^\s\)]+)'
+    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|invidious\.|inv\.|yewtu\.)[^\s\)]+)'
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?')
@@ -698,7 +698,7 @@ def add_youtube_search_links(text):
     for keyword in all_keywords:
         if keyword in modified_text and keyword not in used_keywords:
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
-            invidious_search = f"https://invidious.private.coffee/search?q={search_query}"
+            invidious_search = f"https://inv.nadeko.net/search?q={search_query}"
             
             pattern = rf'\b({re.escape(keyword)})\b'
             
@@ -992,28 +992,28 @@ col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
     st.markdown("""
-👉 [**기계달인**](https://invidious.private.coffee/search?q=기계달인+일반기계기사)  
+👉 [**기계달인**](https://inv.nadeko.net/search?q=기계달인+일반기계기사)  
 (전과목 강의)
 
-👉 [**에듀윌**](https://invidious.private.coffee/search?q=에듀윌+일반기계기사)  
+👉 [**에듀윌**](https://inv.nadeko.net/search?q=에듀윌+일반기계기사)  
 (핵심 요약)
 """)
 
 with col_ch2:
     st.markdown("""
-👉 [**메가파이**](https://invidious.private.coffee/search?q=메가파이+일반기계기사)  
+👉 [**메가파이**](https://inv.nadeko.net/search?q=메가파이+일반기계기사)  
 (자격증 꿀팁)
 
-👉 [**한솔아카데미**](https://invidious.private.coffee/search?q=한솔아카데미+일반기계기사)  
+👉 [**한솔아카데미**](https://inv.nadeko.net/search?q=한솔아카데미+일반기계기사)  
 (기출 해설)
 """)
 
 with col_ch3:
     st.markdown("""
-👉 [**공밀레**](https://invidious.private.coffee/search?q=공밀레+재료역학)  
+👉 [**공밀레**](https://inv.nadeko.net/search?q=공밀레+재료역학)  
 (개념 이해)
 
-👉 [**Learn Engineering**](https://invidious.private.coffee/search?q=Learn+Engineering)  
+👉 [**Learn Engineering**](https://inv.nadeko.net/search?q=Learn+Engineering)  
 (영문/애니메이션)
 """)
 
@@ -1024,39 +1024,39 @@ st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
     st.markdown("""
-- [🧱 기초 강의](https://invidious.private.coffee/search?q=재료역학+기초+강의)
-- [📉 SFD/BMD 그리기](https://invidious.private.coffee/search?q=SFD+BMD+그리는법)
-- [➰ 보의 처짐](https://invidious.private.coffee/search?q=재료역학+보의+처짐)
-- [🌀 모어원](https://invidious.private.coffee/search?q=재료역학+모어원)
-- [🏛️ 좌굴 공식](https://invidious.private.coffee/search?q=재료역학+좌굴+공식)
-- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+재료역학+기출문제)
+- [🧱 기초 강의](https://inv.nadeko.net/search?q=재료역학+기초+강의)
+- [📉 SFD/BMD 그리기](https://inv.nadeko.net/search?q=SFD+BMD+그리는법)
+- [➰ 보의 처짐](https://inv.nadeko.net/search?q=재료역학+보의+처짐)
+- [🌀 모어원](https://inv.nadeko.net/search?q=재료역학+모어원)
+- [🏛️ 좌굴 공식](https://inv.nadeko.net/search?q=재료역학+좌굴+공식)
+- [📝 기출문제](https://inv.nadeko.net/search?q=일반기계기사+재료역학+기출문제)
 """)
 
 with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
     st.markdown("""
-- [🔥 열역학 법칙](https://invidious.private.coffee/search?q=열역학+법칙+설명)
-- [🔄 사이클 정리](https://invidious.private.coffee/search?q=열역학+사이클+정리)
-- [🌡️ 엔트로피](https://invidious.private.coffee/search?q=열역학+엔트로피)
-- [💨 냉동 사이클](https://invidious.private.coffee/search?q=일반기계기사+냉동사이클)
-- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+열역학+기출)
+- [🔥 열역학 법칙](https://inv.nadeko.net/search?q=열역학+법칙+설명)
+- [🔄 사이클 정리](https://inv.nadeko.net/search?q=열역학+사이클+정리)
+- [🌡️ 엔트로피](https://inv.nadeko.net/search?q=열역학+엔트로피)
+- [💨 냉동 사이클](https://inv.nadeko.net/search?q=일반기계기사+냉동사이클)
+- [📝 기출문제](https://inv.nadeko.net/search?q=일반기계기사+열역학+기출)
 """)
 
 with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
     st.markdown("""
-- [💧 유체 성질](https://invidious.private.coffee/search?q=유체역학+점성계수)
-- [🌪️ 베르누이 방정식](https://invidious.private.coffee/search?q=베르누이+방정식+문제풀이)
-- [📏 관로 마찰](https://invidious.private.coffee/search?q=달시+바이스바흐+공식)
-- [⚡ 운동량 방정식](https://invidious.private.coffee/search?q=유체역학+운동량방정식)
-- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+유체역학+기출)
+- [💧 유체 성질](https://inv.nadeko.net/search?q=유체역학+점성계수)
+- [🌪️ 베르누이 방정식](https://inv.nadeko.net/search?q=베르누이+방정식+문제풀이)
+- [📏 관로 마찰](https://inv.nadeko.net/search?q=달시+바이스바흐+공식)
+- [⚡ 운동량 방정식](https://inv.nadeko.net/search?q=유체역학+운동량방정식)
+- [📝 기출문제](https://inv.nadeko.net/search?q=일반기계기사+유체역학+기출)
 """)
 
 with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
     st.markdown("""
-- [⚙️ 기어/베어링](https://invidious.private.coffee/search?q=기계요소설계+기어+베어링)
-- [🔩 나사/볼트](https://invidious.private.coffee/search?q=기계요소설계+나사+효율)
-- [🛡️ 파손 이론](https://invidious.private.coffee/search?q=기계설계+파손이론)
-- [🔗 축/커플링](https://invidious.private.coffee/search?q=기계요소설계+축+설계)
-- [📝 기출문제](https://invidious.private.coffee/search?q=일반기계기사+기계요소설계+기출)
+- [⚙️ 기어/베어링](https://inv.nadeko.net/search?q=기계요소설계+기어+베어링)
+- [🔩 나사/볼트](https://inv.nadeko.net/search?q=기계요소설계+나사+효율)
+- [🛡️ 파손 이론](https://inv.nadeko.net/search?q=기계설계+파손이론)
+- [🔗 축/커플링](https://inv.nadeko.net/search?q=기계요소설계+축+설계)
+- [📝 기출문제](https://inv.nadeko.net/search?q=일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
@@ -1069,18 +1069,18 @@ col_prac1, col_prac2 = st.columns(2)
 with col_prac1:
     st.subheader("📝 필답형")
     st.markdown("""
-- [📖 요약 정리](https://invidious.private.coffee/search?q=일반기계기사+필답형+요약)
-- [✍️ 기출 풀이](https://invidious.private.coffee/search?q=일반기계기사+필답형+기출)
-- [🎯 공식 정리](https://invidious.private.coffee/search?q=일반기계기사+필답형+공식)
+- [📖 요약 정리](https://inv.nadeko.net/search?q=일반기계기사+필답형+요약)
+- [✍️ 기출 풀이](https://inv.nadeko.net/search?q=일반기계기사+필답형+기출)
+- [🎯 공식 정리](https://inv.nadeko.net/search?q=일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
     st.subheader("💻 작업형")
     st.markdown("""
-- [🖱️ 인벤터 기초](https://invidious.private.coffee/search?q=일반기계기사+인벤터+기초)
-- [📐 투상 연습](https://invidious.private.coffee/search?q=일반기계기사+투상+연습)
-- [📏 거칠기/공차](https://invidious.private.coffee/search?q=일반기계기사+거칠기+기하공차)
-- [⚡ 기출 실습](https://invidious.private.coffee/search?q=일반기계기사+작업형+기출)
+- [🖱️ 인벤터 기초](https://inv.nadeko.net/search?q=일반기계기사+인벤터+기초)
+- [📐 투상 연습](https://inv.nadeko.net/search?q=일반기계기사+투상+연습)
+- [📏 거칠기/공차](https://inv.nadeko.net/search?q=일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습](https://inv.nadeko.net/search?q=일반기계기사+작업형+기출)
 """)
 
 st.divider()
@@ -1111,7 +1111,7 @@ with st.expander("📖 추천 자료", expanded=False):
 ### 🌐 사이트
 - [큐넷](https://www.q-net.or.kr) - 시험 접수
 - [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
-- [공학용 계산기](https://invidious.private.coffee/search?q=공학용계산기+사용법)
+- [공학용 계산기](https://inv.nadeko.net/search?q=공학용계산기+사용법)
 """)
 
 st.divider()
@@ -1136,23 +1136,29 @@ with st.expander("🚫 광고 없는 YouTube 시청 비밀", expanded=False):
 2. [LibreTube 앱](https://libretube.dev) 설치
 
 **iPhone:**
-1. Safari에서 https://invidious.private.coffee 북마크
+1. Safari에서 https://inv.nadeko.net 북마크
 2. 또는 이 앱에서 제공하는 링크 클릭!
 
 **모든 기기:**
 - 🎯 이 앱의 모든 링크는 자동으로 광고 없음!
 
-### 🌐 Invidious 공식 인스턴스
-- https://invidious.private.coffee (주 서버)
-- https://inv.nadeko.net (백업 1)
-- https://yt.artemislena.eu (백업 2)
-- https://inv.tux.pizza (백업 3)
-- https://invidious.nerdvpn.de (백업 4)
+### 🌐 Invidious 공식 인스턴스 (모두 안전함)
+- https://inv.nadeko.net (주 서버 - SSL 인증서 정상)
+- https://yt.artemislena.eu (백업 1)
+- https://inv.tux.pizza (백업 2)
+- https://yewtu.be (백업 3)
+- https://invidious.fdn.fr (백업 4)
 
 ### 🔒 왜 광고가 안 나올까?
 Invidious는 YouTube 데이터를 직접 추출해서  
 광고 없는 순수 비디오 스트림만 가져옵니다.  
 **100% 합법**이고 구글도 차단 못 합니다!
+
+### ⚠️ SSL 인증서 경고가 나온다면?
+- 컴퓨터 시간이 미래로 설정되어 있을 가능성 높음
+- Windows: 설정 → 시간 및 언어 → 자동 시간 설정 켜기
+- Mac: 시스템 환경설정 → 날짜 및 시간 → 자동 설정
+- 또는 영상 아래 "다른 서버 선택" 버튼 클릭!
 """)
 
 st.divider()
