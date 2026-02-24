@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="일반기계기사 학습 가이드",
     page_icon="⚙️",
     layout="wide",
-    initial_sidebar_state="collapsed"  # 모바일에서 사이드바 자동 닫기
+    initial_sidebar_state="collapsed"
 )
 
 # ========== 🎨 모바일 최적화 CSS (완전 새로 작성) ==========
@@ -27,7 +27,7 @@ st.markdown("""
         height: 100%;
         min-height: 100vh;
         min-height: -webkit-fill-available;
-        min-height: 100dvh; /* 2025년 표준 */
+        min-height: 100dvh;
         overflow-x: hidden;
         margin: 0;
         padding: 0;
@@ -49,20 +49,17 @@ st.markdown("""
         h3 { font-size: 1.1rem !important; }
         p, li, div { font-size: 0.95rem !important; line-height: 1.6 !important; }
         
-        /* 버튼 터치 영역 확대 */
         button, [data-testid="stButton"] button {
             min-height: 48px !important;
             padding: 12px 20px !important;
             font-size: 1rem !important;
         }
         
-        /* 입력창 터치 최적화 */
         input, textarea {
-            font-size: 16px !important; /* iOS 자동 줌 방지 */
+            font-size: 16px !important;
             min-height: 48px !important;
         }
         
-        /* 컬럼 모바일 대응 */
         [data-testid="column"] {
             min-width: 100% !important;
             margin-bottom: 1rem !important;
@@ -95,6 +92,26 @@ st.markdown("""
         display: inline-block;
         min-height: 44px;
         line-height: 28px;
+    }
+    
+    /* ========== YouTube 플레이어 스타일 ========== */
+    .youtube-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%;
+        margin: 20px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    }
+    
+    .youtube-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
     }
     
     /* ========== 음성 버튼 모바일 최적화 ========== */
@@ -230,7 +247,7 @@ def clean_text_for_tts(text):
     
     return text.strip()
 
-# ========== 🎤 음성 인식 컴포넌트 (완전 재작성 - 모바일 최적화) ==========
+# ========== 🎤 음성 인식 컴포넌트 ==========
 def create_voice_input_component():
     """모바일 완벽 대응 음성 인식"""
     return """
@@ -489,8 +506,44 @@ def create_voice_input_component():
     </script>
     """
 
-# ========== 유틸리티 함수들 ==========
+# ========== 🎬 광고 없는 YouTube 플레이어 생성 (핵심 변경!) ==========
+def create_ad_free_youtube_player(video_id, title="YouTube 영상"):
+    """Invidious 기반 광고 없는 YouTube 플레이어"""
+    # Piped / Invidious 퍼블릭 인스턴스들 (2025년 1월 기준 안정적)
+    piped_instances = [
+        "piped.video",
+        "piped.kavin.rocks",
+        "piped.mint.lgbt",
+        "piped.privacy.com.de"
+    ]
+    
+    # 첫 번째 인스턴스 사용 (자동 폴백 가능하게 여러 개 준비)
+    piped_url = f"https://{piped_instances[0]}/embed/{video_id}?quality=1080p"
+    
+    return f"""
+    <div style="border: 2px solid #ff0000; border-radius: 12px; padding: 15px; margin: 20px 0; background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);">
+        <h4 style="color: #ff0000; margin: 0 0 15px 0;">🎬 {title}</h4>
+        <div class="youtube-container">
+            <iframe 
+                src="{piped_url}"
+                allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+            ></iframe>
+        </div>
+        <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0; text-align: center;">
+            ✅ 광고 없는 플레이어 (Piped 제공) | 
+            <a href="https://www.youtube.com/watch?v={video_id}" target="_blank" style="color: #ff0000;">
+                YouTube에서 보기 →
+            </a>
+        </p>
+    </div>
+    """
+
+# ========== 유틸리티 함수들 (광고 제거 버전으로 업데이트) ==========
 def format_youtube_links(text):
+    """YouTube 링크를 광고 없는 임베디드 플레이어로 변환"""
     youtube_patterns = [
         r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
         r'https?://(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)',
@@ -499,23 +552,7 @@ def format_youtube_links(text):
     
     def replace_youtube(match):
         video_id = match.group(1)
-        full_url = match.group(0)
-        
-        return f"""
-<div style="border: 2px solid #ff0000; border-radius: 12px; padding: 15px; margin: 15px 0; background-color: #fff5f5;">
-    <h4 style="color: #ff0000; margin-top: 0;">📺 추천 영상</h4>
-    <a href="{full_url}" target="_blank" rel="noopener noreferrer">
-        <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
-             style="width: 100%; max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;">
-    </a>
-    <a href="{full_url}" target="_blank" rel="noopener noreferrer" 
-       style="display: block; background-color: #ff0000; color: white; padding: 14px 20px; 
-              border-radius: 10px; text-decoration: none; font-weight: bold; text-align: center; 
-              min-height: 48px; line-height: 20px;">
-        🎬 영상 바로보기 →
-    </a>
-</div>
-"""
+        return create_ad_free_youtube_player(video_id, "추천 영상")
     
     formatted_text = text
     for pattern in youtube_patterns:
@@ -524,7 +561,8 @@ def format_youtube_links(text):
     return formatted_text
 
 def make_links_clickable(text):
-    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be)[^\s\)]+)'
+    """일반 URL을 클릭 가능한 링크로 변환"""
+    url_pattern = r'(https?://(?!(?:www\.)?youtube\.com|youtu\.be|piped\.|invidious\.)[^\s\)]+)'
     
     def replace_url(match):
         url = match.group(1).rstrip('.,;:!?')
@@ -533,6 +571,7 @@ def make_links_clickable(text):
     return re.sub(url_pattern, replace_url, text)
 
 def add_youtube_search_links(text):
+    """키워드에 YouTube 검색 링크 추가 (광고 없는 버전으로 유도)"""
     keywords = [
         "재료역학", "열역학", "유체역학", "기계요소설계",
         "SFD", "BMD", "베르누이", "모어원", "좌굴", "엔트로피",
@@ -564,13 +603,14 @@ def add_youtube_search_links(text):
     
     for keyword in all_keywords:
         if keyword in modified_text and keyword not in used_keywords:
+            # Piped 검색으로 변경 (광고 없음)
             search_query = urllib.parse.quote(f"{keyword} 일반기계기사")
-            youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
+            piped_search_link = f"https://piped.video/results?search_query={search_query}"
             
             pattern = rf'\b({re.escape(keyword)})\b'
             
             if re.search(pattern, modified_text):
-                replacement = f'[\\1 📺]({youtube_link})'
+                replacement = f'[\\1 📺]({piped_search_link})'
                 modified_text = re.sub(pattern, replacement, modified_text, count=1)
                 used_keywords.add(keyword)
     
@@ -579,8 +619,8 @@ def add_youtube_search_links(text):
     def replace_channel(match):
         channel_name = match.group(1).strip()
         search_query = urllib.parse.quote(f"{channel_name} 일반기계기사")
-        youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
-        return f'채널명: [{channel_name} 📺]({youtube_link})'
+        piped_link = f"https://piped.video/results?search_query={search_query}"
+        return f'채널명: [{channel_name} 📺]({piped_link})'
     
     modified_text = re.sub(channel_pattern, replace_channel, modified_text)
     
@@ -589,8 +629,8 @@ def add_youtube_search_links(text):
     def replace_video(match):
         video_title = match.group(1).strip()
         search_query = urllib.parse.quote(video_title)
-        youtube_link = f"https://www.youtube.com/results?search_query={search_query}"
-        return f'추천 영상: ["{video_title}" 🎬]({youtube_link})'
+        piped_link = f"https://piped.video/results?search_query={search_query}"
+        return f'추천 영상: ["{video_title}" 🎬]({piped_link})'
     
     modified_text = re.sub(video_pattern, replace_video, modified_text)
     
@@ -655,7 +695,7 @@ if 'selected_voice' not in st.session_state:
 st.title("⚙️ 일반기계기사 독학 가이드 🎬")
 st.markdown("""
 영욱이와 설매의 합격을 기원합니다.  
-유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
+**✅ 광고 없는** 유튜브 무료 강의와 핵심 기출 풀이 영상 모음입니다.
 """)
 
 st.divider()
@@ -665,7 +705,6 @@ with st.container():
     st.markdown("### 🤖 AI 튜터에게 질문하기")
     st.caption("궁금한 개념을 **🎤 음성, 📝 텍스트 또는 📸 이미지**로 질문하세요!")
     
-    # 🎤 음성 입력
     st.markdown("#### 🎤 음성으로 질문하기")
     components.html(create_voice_input_component(), height=200, scrolling=False)
     
@@ -673,7 +712,6 @@ with st.container():
 
     tab1, tab2 = st.tabs(["📝 텍스트 질문", "📸 이미지 질문"])
     
-    # 텍스트 질문
     with tab1:
         with st.form(key="text_question_form", clear_on_submit=True):
             query = st.text_input(
@@ -705,8 +743,9 @@ with st.container():
 1. 핵심 개념 설명
 2. 공식이나 계산 방법 (있다면)
 3. 시험 출제 경향
-4. 📺 추천 채널 (채널명, 특징, 추천 영상)
-5. 유튜브 검색 키워드 3개
+4. 📺 추천 유튜브 영상 (구체적인 영상 URL 포함 - 가능하면 https://www.youtube.com/watch?v=VIDEO_ID 형식으로)
+5. 추천 채널 (채널명, 특징)
+6. 유튜브 검색 키워드 3개
 """
                             
                             response = model.generate_content(enhanced_query)
@@ -724,7 +763,6 @@ with st.container():
                 if "429" in str(e):
                     st.warning("⏰ API 사용량 제한. 잠시 후 다시 시도하세요.")
     
-    # 이미지 질문
     with tab2:
         st.markdown("📌 **문제 사진, 도면, 공식 스크린샷** 등을 업로드하세요!")
         
@@ -774,7 +812,7 @@ with st.container():
 1. 이미지 내용 분석
 2. 문제라면 단계별 풀이
 3. 관련 개념 및 공식
-4. 📺 추천 영상
+4. 📺 추천 유튜브 영상 (구체적인 URL 포함)
 5. 검색 키워드
 """
                             
@@ -791,7 +829,6 @@ with st.container():
             except Exception as e:
                 st.error(f"❌ 에러 발생: {e}")
 
-    # ✅ 답변 표시 + TTS
     st.markdown("")
     if st.session_state.ai_response:
         col_del, col_voice, col_tts = st.columns([1, 2, 2])
@@ -827,7 +864,6 @@ with st.container():
                         st.session_state.audio_playing = True
                         st.success("✅ 음성 준비 완료!")
         
-        # 오디오 플레이어
         if st.session_state.audio_playing:
             st.markdown("---")
             st.markdown("### 🎧 음성 재생")
@@ -845,13 +881,11 @@ with st.container():
             
             st.markdown("---")
         
-        # 이미지 표시
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="질문한 이미지", use_column_width=True)
         
-        # AI 답변
         response_text = st.session_state.ai_response
-        response_text = format_youtube_links(response_text)
+        response_text = format_youtube_links(response_text)  # 광고 없는 플레이어로 변환
         response_text = add_youtube_search_links(response_text)
         response_text = make_links_clickable(response_text)
         
@@ -859,7 +893,6 @@ with st.container():
         st.markdown("### 💡 AI 답변")
         st.markdown(response_text, unsafe_allow_html=True)
         
-        # 모델 정보
         display_name = get_model_display_name(st.session_state.model_name)
         
         with st.expander("🤖 AI 모델 정보", expanded=False):
@@ -872,82 +905,84 @@ with st.container():
 - ✅ 이미지 분석
 - ✅ 음성 출력 (TTS)
 - ✅ 음성 입력 (STT)
+- ✅ **광고 없는 YouTube 재생** (Piped)
 """)
 
 st.divider()
 
-# ========== 유튜브 채널 추천 ==========
+# ========== 유튜브 채널 추천 (광고 없는 링크로 변경) ==========
 st.header("📺 1. 추천 유튜브 채널")
 
 col_ch1, col_ch2, col_ch3 = st.columns(3)
 
 with col_ch1:
     st.markdown("""
-👉 [**기계달인**](https://www.youtube.com/results?search_query=기계달인+일반기계기사)  
+👉 [**기계달인**](https://piped.video/results?search_query=기계달인+일반기계기사)  
 (전과목 강의)
 
-👉 [**에듀윌**](https://www.youtube.com/results?search_query=에듀윌+일반기계기사)  
+👉 [**에듀윌**](https://piped.video/results?search_query=에듀윌+일반기계기사)  
 (핵심 요약)
 """)
 
 with col_ch2:
     st.markdown("""
-👉 [**메가파이**](https://www.youtube.com/results?search_query=메가파이+일반기계기사)  
+👉 [**메가파이**](https://piped.video/results?search_query=메가파이+일반기계기사)  
 (자격증 꿀팁)
 
-👉 [**한솔아카데미**](https://www.youtube.com/results?search_query=한솔아카데미+일반기계기사)  
+👉 [**한솔아카데미**](https://piped.video/results?search_query=한솔아카데미+일반기계기사)  
 (기출 해설)
 """)
 
 with col_ch3:
     st.markdown("""
-👉 [**공밀레**](https://www.youtube.com/results?search_query=공밀레+재료역학)  
+👉 [**공밀레**](https://piped.video/results?search_query=공밀레+재료역학)  
 (개념 이해)
 
-👉 [**Learn Engineering**](https://www.youtube.com/results?search_query=Learn+Engineering)  
+👉 [**Learn Engineering**](https://piped.video/results?search_query=Learn+Engineering)  
 (영문/애니메이션)
 """)
 
+st.info("💡 **모든 링크는 광고 없는 Piped 플레이어로 연결됩니다!**")
 st.markdown("")
 
-# ========== 과목별 강의 ==========
+# ========== 과목별 강의 (광고 없는 검색 링크) ==========
 st.header("🔍 2. 과목별 핵심 강의")
 
 with st.expander("1️⃣ 재료역학 - 펼쳐보기", expanded=False):
     st.markdown("""
-- [🧱 기초 강의](https://www.youtube.com/results?search_query=재료역학+기초+강의)
-- [📉 SFD/BMD 그리기](https://www.youtube.com/results?search_query=SFD+BMD+그리는법)
-- [➰ 보의 처짐](https://www.youtube.com/results?search_query=재료역학+보의+처짐)
-- [🌀 모어원](https://www.youtube.com/results?search_query=재료역학+모어원)
-- [🏛️ 좌굴 공식](https://www.youtube.com/results?search_query=재료역학+좌굴+공식)
-- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+재료역학+기출문제)
+- [🧱 기초 강의](https://piped.video/results?search_query=재료역학+기초+강의)
+- [📉 SFD/BMD 그리기](https://piped.video/results?search_query=SFD+BMD+그리는법)
+- [➰ 보의 처짐](https://piped.video/results?search_query=재료역학+보의+처짐)
+- [🌀 모어원](https://piped.video/results?search_query=재료역학+모어원)
+- [🏛️ 좌굴 공식](https://piped.video/results?search_query=재료역학+좌굴+공식)
+- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+재료역학+기출문제)
 """)
 
 with st.expander("2️⃣ 기계열역학 - 펼쳐보기"):
     st.markdown("""
-- [🔥 열역학 법칙](https://www.youtube.com/results?search_query=열역학+법칙+설명)
-- [🔄 사이클 정리](https://www.youtube.com/results?search_query=열역학+사이클+정리)
-- [🌡️ 엔트로피](https://www.youtube.com/results?search_query=열역학+엔트로피)
-- [💨 냉동 사이클](https://www.youtube.com/results?search_query=일반기계기사+냉동사이클)
-- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+열역학+기출)
+- [🔥 열역학 법칙](https://piped.video/results?search_query=열역학+법칙+설명)
+- [🔄 사이클 정리](https://piped.video/results?search_query=열역학+사이클+정리)
+- [🌡️ 엔트로피](https://piped.video/results?search_query=열역학+엔트로피)
+- [💨 냉동 사이클](https://piped.video/results?search_query=일반기계기사+냉동사이클)
+- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+열역학+기출)
 """)
 
 with st.expander("3️⃣ 기계유체역학 - 펼쳐보기"):
     st.markdown("""
-- [💧 유체 성질](https://www.youtube.com/results?search_query=유체역학+점성계수)
-- [🌪️ 베르누이 방정식](https://www.youtube.com/results?search_query=베르누이+방정식+문제풀이)
-- [📏 관로 마찰](https://www.youtube.com/results?search_query=달시+바이스바흐+공식)
-- [⚡ 운동량 방정식](https://www.youtube.com/results?search_query=유체역학+운동량방정식)
-- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+유체역학+기출)
+- [💧 유체 성질](https://piped.video/results?search_query=유체역학+점성계수)
+- [🌪️ 베르누이 방정식](https://piped.video/results?search_query=베르누이+방정식+문제풀이)
+- [📏 관로 마찰](https://piped.video/results?search_query=달시+바이스바흐+공식)
+- [⚡ 운동량 방정식](https://piped.video/results?search_query=유체역학+운동량방정식)
+- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+유체역학+기출)
 """)
 
 with st.expander("4️⃣ 기계요소설계 - 펼쳐보기"):
     st.markdown("""
-- [⚙️ 기어/베어링](https://www.youtube.com/results?search_query=기계요소설계+기어+베어링)
-- [🔩 나사/볼트](https://www.youtube.com/results?search_query=기계요소설계+나사+효율)
-- [🛡️ 파손 이론](https://www.youtube.com/results?search_query=기계설계+파손이론)
-- [🔗 축/커플링](https://www.youtube.com/results?search_query=기계요소설계+축+설계)
-- [📝 기출문제](https://www.youtube.com/results?search_query=일반기계기사+기계요소설계+기출)
+- [⚙️ 기어/베어링](https://piped.video/results?search_query=기계요소설계+기어+베어링)
+- [🔩 나사/볼트](https://piped.video/results?search_query=기계요소설계+나사+효율)
+- [🛡️ 파손 이론](https://piped.video/results?search_query=기계설계+파손이론)
+- [🔗 축/커플링](https://piped.video/results?search_query=기계요소설계+축+설계)
+- [📝 기출문제](https://piped.video/results?search_query=일반기계기사+기계요소설계+기출)
 """)
 
 st.markdown("")
@@ -960,18 +995,18 @@ col_prac1, col_prac2 = st.columns(2)
 with col_prac1:
     st.subheader("📝 필답형")
     st.markdown("""
-- [📖 요약 정리](https://www.youtube.com/results?search_query=일반기계기사+필답형+요약)
-- [✍️ 기출 풀이](https://www.youtube.com/results?search_query=일반기계기사+필답형+기출)
-- [🎯 공식 정리](https://www.youtube.com/results?search_query=일반기계기사+필답형+공식)
+- [📖 요약 정리](https://piped.video/results?search_query=일반기계기사+필답형+요약)
+- [✍️ 기출 풀이](https://piped.video/results?search_query=일반기계기사+필답형+기출)
+- [🎯 공식 정리](https://piped.video/results?search_query=일반기계기사+필답형+공식)
 """)
 
 with col_prac2:
     st.subheader("💻 작업형")
     st.markdown("""
-- [🖱️ 인벤터 기초](https://www.youtube.com/results?search_query=일반기계기사+인벤터+기초)
-- [📐 투상 연습](https://www.youtube.com/results?search_query=일반기계기사+투상+연습)
-- [📏 거칠기/공차](https://www.youtube.com/results?search_query=일반기계기사+거칠기+기하공차)
-- [⚡ 기출 실습](https://www.youtube.com/results?search_query=일반기계기사+작업형+기출)
+- [🖱️ 인벤터 기초](https://piped.video/results?search_query=일반기계기사+인벤터+기초)
+- [📐 투상 연습](https://piped.video/results?search_query=일반기계기사+투상+연습)
+- [📏 거칠기/공차](https://piped.video/results?search_query=일반기계기사+거칠기+기하공차)
+- [⚡ 기출 실습](https://piped.video/results?search_query=일반기계기사+작업형+기출)
 """)
 
 st.divider()
@@ -1002,7 +1037,33 @@ with st.expander("📖 추천 자료", expanded=False):
 ### 🌐 사이트
 - [큐넷](https://www.q-net.or.kr) - 시험 접수
 - [기계기술사 카페](https://cafe.naver.com/mechanicalengineer) - 커뮤니티
-- [공학용 계산기](https://www.youtube.com/results?search_query=공학용계산기+사용법)
+- [공학용 계산기](https://piped.video/results?search_query=공학용계산기+사용법)
+""")
+
+st.divider()
+
+# ========== 광고 차단 안내 ==========
+with st.expander("🚫 광고 없는 YouTube 시청 방법", expanded=False):
+    st.markdown("""
+### 🎬 이 앱에서 사용하는 방식
+
+**Piped** - 오픈소스 YouTube 프론트엔드
+- ✅ 100% 광고 없음
+- ✅ 스폰서블록 자동 스킵
+- ✅ 백그라운드 재생 지원
+- ✅ 1080p/4K 지원
+- ✅ 로그인 불필요
+
+### 📱 모바일에서도 광고 없이 보는 법
+
+1. **Android**: NewPipe / LibreTube 앱 설치
+2. **iPhone**: Safari에서 https://piped.video 북마크
+3. **모든 기기**: 이 앱에서 제공하는 링크 클릭!
+
+### 🌐 Piped 공식 인스턴스
+- https://piped.video (권장)
+- https://piped.kavin.rocks
+- https://piped.mint.lgbt
 """)
 
 st.divider()
@@ -1014,8 +1075,11 @@ st.markdown("""
     <p style='font-size: 0.9rem; margin-top: 10px;'>
         💡 TIP: AI 튜터에게 🎤 음성으로 질문하고 🔊 음성으로 답변을 들어보세요!
     </p>
+    <p style='font-size: 0.85rem; margin-top: 10px; color: #10b981; font-weight: bold;'>
+        ✅ 모든 유튜브 영상은 광고 없이 재생됩니다 (Piped 제공)
+    </p>
     <p style='font-size: 0.8rem; margin-top: 15px; color: #999;'>
-        Made with ❤️ | Powered by Gemini AI + Edge TTS + Web Speech API
+        Made with ❤️ | Powered by Gemini AI + Edge TTS + Piped + Web Speech API
     </p>
 </div>
 """, unsafe_allow_html=True)
